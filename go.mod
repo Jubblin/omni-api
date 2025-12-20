@@ -1,4 +1,4 @@
-module github.com/richardw/talos-ctl
+module github.com/jubblin/omni-api
 
 go 1.25.5
 

@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+# Dev best practices
+
+Let's approach this pragmatically. Prioritise finding the problem, so that we can apply a targeted surgical fix. As opposed to applying fixes randomly. This will prevent our fixes from having unwanted side effects. Please add any logs if you need to, and don't hesitate to ask me to copy them with instructions for me to replicate certain actions so you can coordinate these with the logs in an attempt to diagnose the problem. Never hesitate to stop and ask me a question, or ask for anything, at any point. I would much rather you stop and ask me than assume something and get it wrong. If you need to write in a new markdown file, create one with a new name that's not projectplan.

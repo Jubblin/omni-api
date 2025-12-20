@@ -40,7 +40,7 @@ The API requires authentication to connect to Omni. You can use either:
 
   ```bash
   git clone <repository-url>
-  cd talos-ctl
+  cd omni-api
   ```
 
 2. Install dependencies:
@@ -58,7 +58,7 @@ The API requires authentication to connect to Omni. You can use either:
 Or build manually:
 
   ```bash
-  go build -o talos-ctl main.go
+  go build -o omni-api main.go
   ```
 
 ### Using Make
@@ -123,7 +123,7 @@ export OMNI_SERVICE_ACCOUNT_KEY="your-service-account-key"
 2. Run the server:
 
 ```bash
-./talos-ctl
+./omni-api
 ```
 
 Or using make:
@@ -368,7 +368,7 @@ See `TEST_COVERAGE.md` for detailed coverage information and recommendations.
 ### Project Structure
 
 ``` shell
-talos-ctl/
+omni-api/
 ├── main.go                    # Application entry point
 ├── Makefile                   # Build and development commands
 ├── go.mod                     # Go module dependencies

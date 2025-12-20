@@ -15,7 +15,7 @@ test-integration:
 
 # Build the binary
 build:
-	go build -o talos-ctl main.go
+	go build -o omni-api main.go
 
 # Run the application
 run:
@@ -31,6 +31,6 @@ tidy:
 
 # Clean up
 clean:
-	rm -f talos-ctl
+	rm -f omni-api
 	rm -rf docs/
 

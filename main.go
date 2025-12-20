@@ -11,13 +11,13 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
-	_ "github.com/richardw/talos-ctl/docs"
-	"github.com/richardw/talos-ctl/internal/api/handlers"
-	omniclient "github.com/richardw/talos-ctl/internal/client"
+	_ "github.com/jubblin/omni-api/docs"
+	"github.com/jubblin/omni-api/internal/api/handlers"
+	omniclient "github.com/jubblin/omni-api/internal/client"
 )
 
 // @title           Talos Omni Control API
-// @version         1.0
+// @version         0.0.1
 // @description     A REST API to interface with Sidero Omni.
 // @termsOfService  http://swagger.io/terms/
 

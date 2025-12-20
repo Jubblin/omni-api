@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/richardw/talos-ctl/internal/api/handlers"
-	omniclient "github.com/richardw/talos-ctl/internal/client"
+	"github.com/jubblin/omni-api/internal/api/handlers"
+	omniclient "github.com/jubblin/omni-api/internal/client"
 )
 
 // ServerInstance represents a running API server

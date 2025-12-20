@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/richardw/talos-ctl/internal/api/handlers"
+	"github.com/jubblin/omni-api/internal/api/handlers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

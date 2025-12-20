@@ -64,7 +64,7 @@ func TestHealthHandler_GetHealth(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, resp.Status)
 			assert.Equal(t, tt.omniConnected, resp.Omni.Connected)
 			assert.NotEmpty(t, resp.Timestamp)
-			assert.Equal(t, "1.0", resp.Version)
+			assert.Equal(t, "0.0.1", resp.Version)
 			assert.NotEmpty(t, resp.Links["self"])
 			assert.NotEmpty(t, resp.Links["metrics"])
 
