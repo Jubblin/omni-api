@@ -36,3 +36,4 @@ go.work.sum
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .cursor/rules/snyk_rules.mdc
+.DS_Store
