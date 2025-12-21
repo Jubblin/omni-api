@@ -1,4 +1,4 @@
-.PHONY: test build run swagger clean tidy
+.PHONY: test build run swagger clean tidy version version-patch version-minor version-major
 
 # Run all tests
 test:
@@ -33,4 +33,17 @@ tidy:
 clean:
 	rm -f omni-api
 	rm -rf docs/
+
+# Version management
+version:
+	@./scripts/version.sh get
+
+version-patch:
+	@./scripts/version.sh patch
+
+version-minor:
+	@./scripts/version.sh minor
+
+version-major:
+	@./scripts/version.sh major
 

@@ -66,13 +66,71 @@ Or build manually:
 The project includes a Makefile with common commands:
 
 ```bash
-make build    # Build the binary
-make run      # Run the application
-make test     # Run tests
-make swagger  # Generate Swagger documentation
-make tidy     # Tidy Go modules
-make clean    # Clean build artifacts
+make build         # Build the binary
+make run           # Run the application
+make test          # Run tests
+make swagger       # Generate Swagger documentation
+make tidy          # Tidy Go modules
+make clean         # Clean build artifacts
+make version       # Get current version
+make version-patch # Increment patch version (0.0.1 → 0.0.2)
+make version-minor # Increment minor version (0.0.1 → 0.1.0)
+make version-major # Increment major version (0.0.1 → 1.0.0)
 ```
+
+## Versioning
+
+The project uses [Semantic Versioning](https://semver.org/) (SemVer) with automatic patch version incrementing for pull requests.
+
+### Automatic Version Bumping
+
+When you open a pull request targeting the `main` branch, the version is automatically incremented:
+
+- **Patch version** is automatically incremented (e.g., `0.0.1` → `0.0.2`)
+- The version is updated in:
+  - `VERSION` file (source of truth)
+  - `main.go` (Swagger annotation)
+  - `internal/api/handlers/health.go` (health endpoint response)
+  - `docs/` (Swagger documentation is regenerated)
+- Changes are automatically committed to your PR branch
+- The workflow handles rebases and updates intelligently
+
+### Manual Version Management
+
+You can manually manage versions using the Makefile:
+
+```bash
+# Get current version
+make version
+
+# Increment patch version (0.0.1 → 0.0.2)
+make version-patch
+
+# Increment minor version (0.0.1 → 0.1.0)
+make version-minor
+
+# Increment major version (0.0.1 → 1.0.0)
+make version-major
+```
+
+Or use the version script directly:
+
+```bash
+./scripts/version.sh get          # Get current version
+./scripts/version.sh patch        # Increment patch
+./scripts/version.sh minor        # Increment minor
+./scripts/version.sh major        # Increment major
+./scripts/version.sh set 1.2.3   # Set specific version
+```
+
+### Version File
+
+The current version is stored in the `VERSION` file in the repository root. This file is the source of truth for the project version and is used by:
+
+- Build workflows
+- Swagger documentation
+- Health endpoint
+- Container image tags
 
 ## Configuration
 
@@ -516,6 +574,36 @@ If Swagger docs are outdated:
 2. Ensure Swagger annotations are correct in handler files
 3. Check that the `docs/` directory is writable
 
+## CI/CD and Container Images
+
+### GitHub Actions
+
+The repository includes GitHub Actions workflows for automated builds:
+
+- **Multi-Architecture Builds**: Automatically builds containers for AMD64 and ARM64
+- **Container Signing**: All images are cryptographically signed using cosign
+- **Security Scanning**: Automated vulnerability scanning with Trivy and Snyk
+- **SBOM Generation**: Software Bill of Materials for each build
+
+See [.github/workflows/README.md](.github/workflows/README.md) for detailed workflow documentation.
+
+### Container Images
+
+Pre-built container images are available on GitHub Container Registry:
+
+```bash
+# Pull latest image
+docker pull ghcr.io/jubblin/omni-api:latest
+
+# Pull specific version
+docker pull ghcr.io/jubblin/omni-api:0.0.1
+
+# Pull for ARM64
+docker pull --platform linux/arm64 ghcr.io/jubblin/omni-api:latest
+```
+
+For detailed Docker usage, see [README.Docker.md](README.Docker.md).
+
 ## Documentation
 
 Additional documentation is available in the following files:
@@ -524,6 +612,9 @@ Additional documentation is available in the following files:
 - **[TEST_COVERAGE.md](TEST_COVERAGE.md)** - Test coverage report, statistics, and recommendations
 - **[MACHINE_ENHANCEMENTS.md](MACHINE_ENHANCEMENTS.md)** - Machine endpoint enhancements and implementation details
 - **[integration/README.md](integration/README.md)** - Integration test suite documentation
+- **[README.Docker.md](README.Docker.md)** - Docker build and deployment guide
+- **[.github/workflows/README.md](.github/workflows/README.md)** - CI/CD workflow documentation
+- **[.slsa/README.md](.slsa/README.md)** - SLSA compliance documentation
 
 Each document includes navigation links back to this README and to other related documentation.
 

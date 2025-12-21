@@ -1,0 +1,53 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+!docs/swagger.json
+!docs/swagger.yaml
+!docs/docs.go
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.code-workspace
+
+# Test files
+*_test.go
+integration/
+test/
+
+# Build artifacts
+omni-api
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Environment files
+.env
+.envrc
+.envrc_sample
+
+# Coverage reports
+*.out
+coverage.html
+
+# Cursor rules
+.cursor/
+
+# Makefile (not needed in container)
+Makefile

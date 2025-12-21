@@ -1,0 +1,196 @@
+name: Auto-increment Version on PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    name: Bump Patch Version
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'master'
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}:base-branch
+
+      - name: Get base version from main branch
+        id: base-version
+        run: |
+          BASE_VERSION=$(git show base-branch:VERSION 2>/dev/null || echo "0.0.1")
+          echo "base-version=$BASE_VERSION" >> $GITHUB_OUTPUT
+          echo "Base version from main: $BASE_VERSION"
+
+      - name: Get current PR version
+        id: pr-version
+        run: |
+          if [ -f VERSION ]; then
+            PR_VERSION=$(cat VERSION)
+          else
+            PR_VERSION=""
+          fi
+          echo "pr-version=$PR_VERSION" >> $GITHUB_OUTPUT
+          echo "Current PR version: $PR_VERSION"
+
+      - name: Check if version needs incrementing
+        id: version-check
+        run: |
+          BASE_VERSION="${{ steps.base-version.outputs.base-version }}"
+          PR_VERSION="${{ steps.pr-version.outputs.pr-version }}"
+          
+          # Parse version components
+          IFS='.' read -r BASE_MAJOR BASE_MINOR BASE_PATCH <<< "$BASE_VERSION"
+          
+          # Check if PR version exists and is valid
+          if [ -n "$PR_VERSION" ] && [[ "$PR_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            IFS='.' read -r PR_MAJOR PR_MINOR PR_PATCH <<< "$PR_VERSION"
+            
+            # If PR version is already higher than base, no need to increment
+            if [ "$PR_MAJOR" -gt "$BASE_MAJOR" ] || \
+               ([ "$PR_MAJOR" -eq "$BASE_MAJOR" ] && [ "$PR_MINOR" -gt "$BASE_MINOR" ]) || \
+               ([ "$PR_MAJOR" -eq "$BASE_MAJOR" ] && [ "$PR_MINOR" -eq "$BASE_MINOR" ] && [ "$PR_PATCH" -gt "$BASE_PATCH" ]); then
+              echo "Version already incremented: $PR_VERSION"
+              echo "needs-increment=false" >> $GITHUB_OUTPUT
+              echo "new-version=$PR_VERSION" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          
+          # Increment patch version
+          NEW_PATCH=$((BASE_PATCH + 1))
+          NEW_VERSION="${BASE_MAJOR}.${BASE_MINOR}.${NEW_PATCH}"
+          echo "needs-increment=true" >> $GITHUB_OUTPUT
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Update version files
+        if: steps.version-check.outputs.needs-increment == 'true'
+        run: |
+          NEW_VERSION="${{ steps.version-check.outputs.new-version }}"
+          
+          # Update VERSION file
+          echo "$NEW_VERSION" > VERSION
+          
+          # Update main.go - handle both spaces and tabs
+          sed -i.bak "s/@version[[:space:]]*[0-9]\+\.[0-9]\+\.[0-9]\+/@version         $NEW_VERSION/" main.go
+          rm -f main.go.bak
+          
+          # Update health.go
+          sed -i.bak "s/Version:[[:space:]]*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/Version:   \"$NEW_VERSION\"/" internal/api/handlers/health.go
+          rm -f internal/api/handlers/health.go.bak
+          
+          echo "Updated version to $NEW_VERSION in:"
+          echo "  - VERSION"
+          echo "  - main.go"
+          echo "  - internal/api/handlers/health.go"
+
+      - name: Check for changes
+        if: steps.version-check.outputs.needs-increment == 'true'
+        id: changes
+        run: |
+          # Check if there are any changes (including docs/)
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected:"
+            git diff --name-status
+            git diff
+          fi
+
+      - name: Commit and push version update
+        if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'
+        run: |
+          git add VERSION main.go internal/api/handlers/health.go docs/
+          git commit -m "chore: auto-increment version to ${{ steps.version-check.outputs.new-version }} [skip ci]"
+          # Use force push with lease to avoid conflicts, but only if needed
+          git push origin ${{ github.event.pull_request.head.ref }} || \
+            (git pull --rebase origin ${{ github.event.pull_request.head.ref }} && \
+             git push origin ${{ github.event.pull_request.head.ref }})
+
+      - name: Comment on PR (version incremented)
+        if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Check if we already commented on this PR
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Version Auto-incremented')
+            );
+            
+            if (!botComment) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `✅ **Version Auto-incremented**
+
+            Version has been automatically incremented from \`${{ steps.base-version.outputs.base-version }}\` to \`${{ steps.version-check.outputs.new-version }}\`.
+
+            Updated files:
+            - \`VERSION\`
+            - \`main.go\`
+            - \`internal/api/handlers/health.go\`
+
+            This commit will be automatically included in your PR.`
+              });
+            }
+
+      - name: Comment on PR (no increment needed)
+        if: steps.version-check.outputs.needs-increment == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Check if we already commented on this PR
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Version Check')
+            );
+            
+            if (!botComment) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `ℹ️ **Version Check**
+
+            Version is already incremented: \`${{ steps.version-check.outputs.new-version }}\`
+
+            No version update needed.`
+              });
+            }
