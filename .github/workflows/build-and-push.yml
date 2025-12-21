@@ -399,7 +399,7 @@ jobs:
 
       - name: Generate SLSA provenance attestations
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.digests.outputs.manifest-digest }}
