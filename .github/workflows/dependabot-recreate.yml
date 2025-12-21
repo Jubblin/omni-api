@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Get all open Dependabot pull requests
         id: get-prs
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -46,7 +46,7 @@ jobs:
 
       - name: Recreate Dependabot PRs
         if: steps.get-prs.outputs.result != '[]'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
