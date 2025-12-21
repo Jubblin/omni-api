@@ -582,7 +582,7 @@ The repository includes GitHub Actions workflows for automated builds:
 
 - **Multi-Architecture Builds**: Automatically builds containers for AMD64 and ARM64
 - **Container Signing**: All images are cryptographically signed using cosign
-- **Security Scanning**: Automated vulnerability scanning with Trivy and Snyk
+- **Security Scanning**: Automated vulnerability scanning with Trivy
 - **SBOM Generation**: Software Bill of Materials for each build
 
 See [.github/workflows/README.md](.github/workflows/README.md) for detailed workflow documentation.

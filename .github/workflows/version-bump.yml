@@ -16,7 +16,7 @@ jobs:
     name: Bump Patch Version
     runs-on: ubuntu-latest
     if: github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'master'
-    
+
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -57,10 +57,10 @@ jobs:
         run: |
           BASE_VERSION="${{ steps.base-version.outputs.base-version }}"
           PR_VERSION="${{ steps.pr-version.outputs.pr-version }}"
-          
+
           # Parse version components
           IFS='.' read -r BASE_MAJOR BASE_MINOR BASE_PATCH <<< "$BASE_VERSION"
-          
+
           # Check if PR version exists and is valid
           if [ -n "$PR_VERSION" ] && [[ "$PR_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             IFS='.' read -r PR_MAJOR PR_MINOR PR_PATCH <<< "$PR_VERSION"
@@ -75,7 +75,7 @@ jobs:
               exit 0
             fi
           fi
-          
+
           # Increment patch version
           NEW_PATCH=$((BASE_PATCH + 1))
           NEW_VERSION="${BASE_MAJOR}.${BASE_MINOR}.${NEW_PATCH}"
@@ -87,18 +87,18 @@ jobs:
         if: steps.version-check.outputs.needs-increment == 'true'
         run: |
           NEW_VERSION="${{ steps.version-check.outputs.new-version }}"
-          
+
           # Update VERSION file
           echo "$NEW_VERSION" > VERSION
-          
+
           # Update main.go - handle both spaces and tabs
           sed -i.bak "s/@version[[:space:]]*[0-9]\+\.[0-9]\+\.[0-9]\+/@version         $NEW_VERSION/" main.go
           rm -f main.go.bak
-          
+
           # Update health.go
           sed -i.bak "s/Version:[[:space:]]*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/Version:   \"$NEW_VERSION\"/" internal/api/handlers/health.go
           rm -f internal/api/handlers/health.go.bak
-          
+
           echo "Updated version to $NEW_VERSION in:"
           echo "  - VERSION"
           echo "  - main.go"
@@ -140,12 +140,12 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.data.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Version Auto-incremented')
             );
-            
+
             if (!botComment) {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
@@ -176,12 +176,12 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.data.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Version Check')
             );
-            
+
             if (!botComment) {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
