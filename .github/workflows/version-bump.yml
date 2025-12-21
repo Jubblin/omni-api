@@ -119,14 +119,16 @@ jobs:
           fi
 
       - name: Commit and push version update
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'
         run: |
           git add VERSION main.go internal/api/handlers/health.go docs/
           git commit -m "chore: auto-increment version to ${{ steps.version-check.outputs.new-version }} [skip ci]"
           # Use force push with lease to avoid conflicts, but only if needed
-          git push origin ${{ github.event.pull_request.head.ref }} || \
-            (git pull --rebase origin ${{ github.event.pull_request.head.ref }} && \
-             git push origin ${{ github.event.pull_request.head.ref }})
+          git push origin ${{ env.PR_HEAD_REF }} || \
+            (git pull --rebase origin ${{ env.PR_HEAD_REF }} && \
+             git push origin ${{ env.PR_HEAD_REF }})
 
       - name: Comment on PR (version incremented)
         if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'
