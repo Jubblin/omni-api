@@ -59,6 +59,7 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 - ✅ Updates version in `main.go` (Swagger annotation)
 - ✅ Updates version in `internal/api/handlers/health.go` (health endpoint)
 - ✅ Regenerates Swagger documentation (`docs/`) with new version
+- ✅ Adds version number as label to PR (e.g., `v0.0.2`)
 - ✅ Handles rebases (checks if version already incremented)
 - ✅ Commits changes back to PR branch
 - ✅ Comments on PR with version update status

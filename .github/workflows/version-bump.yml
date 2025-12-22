@@ -5,7 +5,13 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - main
-      - master
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to bump version on"
+        required: true
+        type: string
+        default: "main"
 
 permissions:
   contents: write
@@ -15,7 +21,7 @@ jobs:
   bump-version:
     name: Bump Patch Version
     runs-on: ubuntu-latest
-    if: github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'master'
+    if: github.event.pull_request.base.ref == 'main'
 
     steps:
       - name: Checkout PR branch
@@ -129,6 +135,55 @@ jobs:
           git push origin ${{ env.PR_HEAD_REF }} || \
             (git pull --rebase origin ${{ env.PR_HEAD_REF }} && \
              git push origin ${{ env.PR_HEAD_REF }})
+
+      - name: Add version label to PR
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = '${{ steps.version-check.outputs.new-version }}';
+            const versionLabel = `v${version}`;
+
+            // Get current labels
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const currentLabels = issue.labels.map(label => label.name);
+
+            // Remove any existing version labels (format: vX.Y.Z)
+            const versionLabelPattern = /^v\d+\.\d+\.\d+$/;
+            const labelsToRemove = currentLabels.filter(label => versionLabelPattern.test(label));
+
+            // Remove old version labels
+            for (const label of labelsToRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: label,
+                });
+                console.log(`Removed old version label: ${label}`);
+              } catch (error) {
+                console.log(`Could not remove label ${label}:`, error.message);
+              }
+            }
+
+            // Add new version label
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [versionLabel],
+              });
+              console.log(`✅ Added version label: ${versionLabel}`);
+            } catch (error) {
+              console.log(`Could not add label ${versionLabel}:`, error.message);
+            }
 
       - name: Comment on PR (version incremented)
         if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'

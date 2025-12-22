@@ -615,6 +615,7 @@ Additional documentation is available in the following files:
 - **[README.Docker.md](README.Docker.md)** - Docker build and deployment guide
 - **[.github/workflows/README.md](.github/workflows/README.md)** - CI/CD workflow documentation
 - **[.slsa/README.md](.slsa/README.md)** - SLSA compliance documentation
+- **[.checkov-compliance.md](.checkov-compliance.md)** - Checkov Dockerfile compliance documentation
 
 Each document includes navigation links back to this README and to other related documentation.
 
