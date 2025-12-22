@@ -69,13 +69,13 @@ The project includes a Makefile with common commands:
 make build         # Build the binary
 make run           # Run the application
 make test          # Run tests
-make swagger       # Generate Swagger documentation
-make tidy          # Tidy Go modules
-make clean         # Clean build artifacts
-make version       # Get current version
-make version-patch # Increment patch version (0.0.1 → 0.0.2)
-make version-minor # Increment minor version (0.0.1 → 0.1.0)
-make version-major # Increment major version (0.0.1 → 1.0.0)
+make swagger        # Generate Swagger documentation
+make tidy           # Tidy Go modules
+make clean          # Clean build artifacts
+make version        # Get current version
+make version-patch  # Increment patch version (0.0.1 → 0.0.2)
+make version-minor  # Increment minor version (0.0.1 → 0.1.0)
+make version-major  # Increment major version (0.0.1 → 1.0.0)
 ```
 
 ## Versioning
