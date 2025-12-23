@@ -69,13 +69,13 @@ The project includes a Makefile with common commands:
 make build         # Build the binary
 make run           # Run the application
 make test          # Run tests
-make swagger       # Generate Swagger documentation
-make tidy          # Tidy Go modules
-make clean         # Clean build artifacts
-make version       # Get current version
-make version-patch # Increment patch version (0.0.1 → 0.0.2)
-make version-minor # Increment minor version (0.0.1 → 0.1.0)
-make version-major # Increment major version (0.0.1 → 1.0.0)
+make swagger        # Generate Swagger documentation
+make tidy           # Tidy Go modules
+make clean          # Clean build artifacts
+make version        # Get current version
+make version-patch  # Increment patch version (0.0.1 → 0.0.2)
+make version-minor  # Increment minor version (0.0.1 → 0.1.0)
+make version-major  # Increment major version (0.0.1 → 1.0.0)
 ```
 
 ## Versioning
@@ -582,7 +582,7 @@ The repository includes GitHub Actions workflows for automated builds:
 
 - **Multi-Architecture Builds**: Automatically builds containers for AMD64 and ARM64
 - **Container Signing**: All images are cryptographically signed using cosign
-- **Security Scanning**: Automated vulnerability scanning with Trivy and Snyk
+- **Security Scanning**: Automated vulnerability scanning with Trivy
 - **SBOM Generation**: Software Bill of Materials for each build
 
 See [.github/workflows/README.md](.github/workflows/README.md) for detailed workflow documentation.
@@ -615,6 +615,7 @@ Additional documentation is available in the following files:
 - **[README.Docker.md](README.Docker.md)** - Docker build and deployment guide
 - **[.github/workflows/README.md](.github/workflows/README.md)** - CI/CD workflow documentation
 - **[.slsa/README.md](.slsa/README.md)** - SLSA compliance documentation
+- **[.checkov-compliance.md](.checkov-compliance.md)** - Checkov Dockerfile compliance documentation
 
 Each document includes navigation links back to this README and to other related documentation.
 
