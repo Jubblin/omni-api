@@ -621,7 +621,7 @@ Each document includes navigation links back to this README and to other related
 
 ## License
 
-Apache 2.0 - See LICENSE file for details.
+MIT - See LICENSE file for details.
 
 ## Contributing
 
