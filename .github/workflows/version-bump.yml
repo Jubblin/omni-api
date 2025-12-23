@@ -80,6 +80,11 @@ jobs:
               echo "new-version=$PR_VERSION" >> $GITHUB_OUTPUT
               exit 0
             fi
+            
+            # If PR version equals base version, we need to increment (e.g., after a rebase)
+            if [ "$PR_MAJOR" -eq "$BASE_MAJOR" ] && [ "$PR_MINOR" -eq "$BASE_MINOR" ] && [ "$PR_PATCH" -eq "$BASE_PATCH" ]; then
+              echo "PR version equals base version (likely after rebase), incrementing..."
+            fi
           fi
 
           # Increment patch version
