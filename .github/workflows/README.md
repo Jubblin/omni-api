@@ -9,12 +9,14 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 **Purpose**: Builds multi-architecture container images (AMD64 and ARM64) and pushes them to GitHub Container Registry (GHCR) with cryptographic signatures.
 
 **Triggers**:
+
 - Push to `main` or `master` branch
 - Push of version tags (e.g., `v0.0.1`)
 - Pull requests (builds but doesn't push)
 - Manual workflow dispatch
 
 **Features**:
+
 - ✅ Dockerfile scanning with Hadolint and Checkov (before build)
 - ✅ Multi-architecture builds (linux/amd64, linux/arm64)
 - ✅ Container scanning with Trivy (after build, per architecture)
@@ -26,6 +28,7 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 - ✅ Security scanning integration
 
 **Outputs**:
+
 - Container images pushed to `ghcr.io/<owner>/<repo>`
 - Signed container images
 - SBOM artifacts (separate for AMD64 and ARM64)
@@ -33,6 +36,7 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 - Build summaries with scan status
 
 **Tags Created**:
+
 - Branch name (e.g., `main`)
 - Commit SHA (e.g., `main-abc1234`)
 - Semantic version (e.g., `0.0.1`, `0.0`, `0`)
@@ -43,21 +47,25 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 **Purpose**: Automatically increments patch version numbers for pull requests targeting the main branch.
 
 **Triggers**:
+
 - Pull request opened to `main` or `master`
 - Pull request synchronized (updated/rebased)
 - Pull request reopened
 
 **Features**:
+
 - ✅ Automatic patch version increment
 - ✅ Updates VERSION file
 - ✅ Updates version in `main.go` (Swagger annotation)
 - ✅ Updates version in `internal/api/handlers/health.go` (health endpoint)
 - ✅ Regenerates Swagger documentation (`docs/`) with new version
+- ✅ Adds version number as label to PR (e.g., `v0.0.2`)
 - ✅ Handles rebases (checks if version already incremented)
 - ✅ Commits changes back to PR branch
 - ✅ Comments on PR with version update status
 
 **How it works**:
+
 1. Reads base version from `main` branch's `VERSION` file
 2. Checks if PR branch already has an incremented version
 3. If not, increments patch version (e.g., `0.0.1` → `0.0.2`)
@@ -66,27 +74,56 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 6. Comments on PR with update status
 
 **Version File**:
+
 - The `VERSION` file in the repository root stores the current version
 - Format: `MAJOR.MINOR.PATCH` (e.g., `0.0.1`)
 - Can be manually updated using `make version-patch`, `make version-minor`, or `make version-major`
+
+### dependabot-recreate.yml
+
+**Purpose**: Automatically rebases Dependabot pull requests when the destination branch (main/master) is updated.
+
+**Triggers**:
+
+- Push to `main` or `master` branch
+
+**Features**:
+
+- ✅ Automatically finds all open Dependabot PRs
+- ✅ Rebases PRs by commenting `@dependabot rebase` (less disruptive than recreate)
+- ✅ Prevents duplicate comments (checks for recent rebase/recreate comments)
+- ✅ Handles rate limiting with delays between requests
+- ✅ Logs all actions for debugging
+
+**How it works**:
+
+1. Triggers when code is pushed to `main` or `master`
+2. Lists all open pull requests targeting the updated branch
+3. Filters for Dependabot PRs (bot user)
+4. Comments `@dependabot rebase` on each PR
+5. Dependabot rebases the PR with the latest base branch changes
+
+**Note**: This works in conjunction with `rebase-strategy: "auto"` in `dependabot.yml` to ensure PRs stay up-to-date with the destination branch. The workflow uses `@dependabot rebase` instead of `@dependabot recreate` to avoid recreating the entire PR, which is less disruptive.
 
 ### security-scan.yml
 
 **Purpose**: Performs security scanning on container images and codebase.
 
 **Triggers**:
+
 - Push to `main` or `master` branch
 - Push of version tags
 - Pull requests
 - Weekly schedule (Mondays at 00:00 UTC)
 
 **Features**:
+
 - ✅ Trivy container vulnerability scanning
 - ✅ Trivy filesystem scanning
-- ✅ Snyk dependency scanning (optional)
 - ✅ SARIF upload to GitHub Security
 
 **Scans**:
+
 - Container image vulnerabilities
 - Go dependencies
 - Filesystem security issues
@@ -96,16 +133,18 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 ### Required Secrets
 
 No secrets are required for basic functionality. The workflow uses:
+
 - `GITHUB_TOKEN` (automatically provided) for registry authentication
 - Keyless signing with cosign (no keys needed)
 
 ### Optional Secrets
 
-- `SNYK_TOKEN`: For Snyk security scanning (if using Snyk)
+No optional secrets required.
 
 ### Permissions
 
 The workflows require the following permissions:
+
 - `contents: read` - Read repository contents
 - `packages: write` - Push to GitHub Container Registry
 - `id-token: write` - For keyless signing with cosign and SLSA attestations
@@ -189,6 +228,7 @@ After building each architecture, containers are scanned:
 ### Container Signing
 
 All container images are signed using cosign with keyless signing:
+
 - Uses GitHub OIDC for authentication
 - No private keys to manage
 - Verifiable signatures in registry
@@ -196,6 +236,7 @@ All container images are signed using cosign with keyless signing:
 ### SBOM Generation
 
 Software Bill of Materials is generated for each architecture:
+
 - SPDX JSON format
 - Separate SBOMs for AMD64 and ARM64
 - Uploaded as workflow artifacts (90-day retention)
@@ -228,6 +269,7 @@ See [.slsa/README.md](../.slsa/README.md) for detailed SLSA compliance documenta
 ### Provenance
 
 Build provenance is automatically generated in multiple formats:
+
 - **GitHub Artifact Attestations**: SLSA-compliant provenance via `actions/attest-build-provenance`
 - **Docker Buildx Provenance**: Full build provenance (mode=max)
 - **Build information**: Workflow run, timestamp, environment
@@ -236,8 +278,7 @@ Build provenance is automatically generated in multiple formats:
 
 ### Additional Security Scanning
 
-- **Snyk**: Dependency vulnerability scanning (optional, in separate workflow)
-- All results uploaded to GitHub Security tab
+All results uploaded to GitHub Security tab
 
 ## Troubleshooting
 

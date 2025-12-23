@@ -1,8 +1,9 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.5-alpine3.23 AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
+
 
 # Set working directory
 WORKDIR /build
