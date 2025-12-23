@@ -71,7 +71,7 @@ LABEL org.opencontainers.image.title="Omni API" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${COMMIT_SHA}" \
       org.opencontainers.image.source="https://github.com/jubblin/omni-api" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="MIT"
 
 # Run the binary
 ENTRYPOINT ["/usr/local/bin/omni-api"]

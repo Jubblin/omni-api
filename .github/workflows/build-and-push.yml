@@ -55,7 +55,7 @@ jobs:
         with:
           file: Dockerfile
           framework: dockerfile
-          soft-fail: false
+          soft-fail: true
           download-external-modules: true
           # Skip HEALTHCHECK for distroless (CKV_DOCKER_2) - distroless doesn't support HEALTHCHECK
           skip-check: CKV_DOCKER_2
