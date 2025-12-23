@@ -102,18 +102,15 @@ jobs:
           # Update VERSION file
           echo "$NEW_VERSION" > VERSION
 
-          # Update main.go - handle both spaces and tabs
+          # Update main.go Swagger annotation - handle both spaces and tabs
+          # Note: The actual version in code uses a variable set via ldflags at build time
           sed -i.bak "s/@version[[:space:]]*[0-9]\+\.[0-9]\+\.[0-9]\+/@version         $NEW_VERSION/" main.go
           rm -f main.go.bak
 
-          # Update health.go
-          sed -i.bak "s/Version:[[:space:]]*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/Version:   \"$NEW_VERSION\"/" internal/api/handlers/health.go
-          rm -f internal/api/handlers/health.go.bak
-
           echo "Updated version to $NEW_VERSION in:"
           echo "  - VERSION"
-          echo "  - main.go"
-          echo "  - internal/api/handlers/health.go"
+          echo "  - main.go (Swagger annotation)"
+          echo "Note: Version in health.go is set via ldflags at build time"
 
       - name: Check for changes
         if: steps.version-check.outputs.needs-increment == 'true'
@@ -134,7 +131,7 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'
         run: |
-          git add VERSION main.go internal/api/handlers/health.go docs/
+          git add VERSION main.go docs/
           git commit -m "chore: auto-increment version to ${{ steps.version-check.outputs.new-version }} [skip ci]"
           # Use force push with lease to avoid conflicts, but only if needed
           git push origin ${{ env.PR_HEAD_REF }} || \
@@ -219,8 +216,9 @@ jobs:
 
             Updated files:
             - \`VERSION\`
-            - \`main.go\`
-            - \`internal/api/handlers/health.go\`
+            - \`main.go\` (Swagger annotation)
+
+            Note: Version in \`health.go\` is set via ldflags at build time from the \`VERSION\` file.
 
             This commit will be automatically included in your PR.`
               });

@@ -30,7 +30,7 @@ ARG COMMIT_SHA
 ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
-    -ldflags="-w -s -X main.version=${VERSION} -X main.buildDate=${BUILD_DATE} -X main.commitSha=${COMMIT_SHA}" \
+    -ldflags="-w -s -X main.Version=${VERSION} -X github.com/jubblin/omni-api/internal/api/handlers.Version=${VERSION} -X main.buildDate=${BUILD_DATE} -X main.commitSha=${COMMIT_SHA}" \
     -a -installsuffix cgo \
     -o omni-api \
     main.go
