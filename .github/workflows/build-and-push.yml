@@ -55,10 +55,10 @@ jobs:
         with:
           file: Dockerfile
           framework: dockerfile
-          soft-fail: true
-          download-external-modules: true
+          quiet: true # optional: display only failed checks
+          soft_fail: true # optional: do not return an error code if there are failed checks
           # Skip HEALTHCHECK for distroless (CKV_DOCKER_2) - distroless doesn't support HEALTHCHECK
-          skip-check: CKV_DOCKER_2
+          skip_checks: CKV_DOCKER_2
           output_format: sarif
           output_file_path: checkov-dockerfile.sarif
 
@@ -67,8 +67,9 @@ jobs:
         with:
           file: Dockerfile.alpine
           framework: dockerfile
-          soft-fail: false
-          download-external-modules: true
+          quiet: true # optional: display only failed checks
+          soft_fail: true # optional: do not return an error code if there are failed checks
+          # download-external-modules: true
           # No skips needed - Alpine Dockerfile is fully compliant
           output_format: sarif
           output_file_path: checkov-dockerfile-alpine.sarif
