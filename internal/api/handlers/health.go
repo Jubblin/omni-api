@@ -64,7 +64,7 @@ func (h *HealthHandler) GetHealth(c *gin.Context) {
 	resp := HealthResponse{
 		Status:    status,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Version:   "0.0.5",
+		Version:   "0.0.6",
 		Omni:      omniHealth,
 		Links: map[string]string{
 			"self":    buildURL(c, "/health"),
