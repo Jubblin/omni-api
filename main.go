@@ -16,8 +16,12 @@ import (
 	omniclient "github.com/jubblin/omni-api/internal/client"
 )
 
+// Version is set at build time via ldflags
+// Default value if not set during build
+var Version = "dev"
+
 // @title           Talos Omni Control API
-// @version         0.0.2
+// @version         0.0.5
 // @description     A REST API to interface with Sidero Omni.
 // @termsOfService  http://swagger.io/terms/
 

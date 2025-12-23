@@ -32,10 +32,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: Dockerfile
           failure-threshold: error
@@ -43,29 +43,49 @@ jobs:
           ignore: DL3008,DL3009
 
       - name: Run Hadolint on Alpine variant
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: Dockerfile.alpine
           failure-threshold: error
           format: tty
           ignore: DL3008,DL3009
 
-      - name: Run Checkov on Dockerfiles
+      - name: Run Checkov on Dockerfile (distroless)
         uses: bridgecrewio/checkov-action@master
         with:
-          directory: .
+          file: Dockerfile
           framework: dockerfile
           soft-fail: false
           download-external-modules: true
-          skip-check: CKV_DOCKER_3 # Skip check for exposed ports (we use EXPOSE intentionally)
+          # Skip HEALTHCHECK for distroless (CKV_DOCKER_2) - distroless doesn't support HEALTHCHECK
+          skip-check: CKV_DOCKER_2
           output_format: sarif
           output_file_path: checkov-dockerfile.sarif
 
-      - name: Upload Checkov results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Run Checkov on Dockerfile.alpine
+        uses: bridgecrewio/checkov-action@master
+        with:
+          file: Dockerfile.alpine
+          framework: dockerfile
+          soft-fail: false
+          download-external-modules: true
+          # No skips needed - Alpine Dockerfile is fully compliant
+          output_format: sarif
+          output_file_path: checkov-dockerfile-alpine.sarif
+
+      - name: Upload Checkov results to GitHub Security (Dockerfile)
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: checkov-dockerfile.sarif
+          category: checkov-dockerfile
+
+      - name: Upload Checkov results to GitHub Security (Dockerfile.alpine)
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: checkov-dockerfile-alpine.sarif
+          category: checkov-dockerfile-alpine
 
   build-and-push:
     name: Build and Push Multi-Arch Container
@@ -80,7 +100,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Fetch all history for tags
 
@@ -139,7 +159,7 @@ jobs:
 
       - name: Build AMD64 container (local)
         id: build-amd64
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -160,7 +180,7 @@ jobs:
 
       - name: Build ARM64 container (local)
         id: build-arm64
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -245,7 +265,7 @@ jobs:
 
       - name: Upload Trivy scan results (AMD64)
         if: github.event_name != 'pull_request' && always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true
         with:
           sarif_file: trivy-amd64.sarif
@@ -253,7 +273,7 @@ jobs:
 
       - name: Upload Trivy scan results (ARM64)
         if: github.event_name != 'pull_request' && always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true
         with:
           sarif_file: trivy-arm64.sarif
@@ -261,7 +281,7 @@ jobs:
 
       - name: Upload SBOM artifacts
         if: github.event_name != 'pull_request' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         continue-on-error: true
         with:
           name: sboms-${{ steps.version.outputs.version }}-${{ steps.commit.outputs.sha }}
@@ -399,7 +419,7 @@ jobs:
 
       - name: Generate SLSA provenance attestations
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.digests.outputs.manifest-digest }}

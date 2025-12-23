@@ -5,7 +5,13 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - main
-      - master
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to bump version on"
+        required: true
+        type: string
+        default: "main"
 
 permissions:
   contents: write
@@ -15,11 +21,11 @@ jobs:
   bump-version:
     name: Bump Patch Version
     runs-on: ubuntu-latest
-    if: github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'master'
-    
+    if: github.event.pull_request.base.ref == 'main'
+
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -57,10 +63,10 @@ jobs:
         run: |
           BASE_VERSION="${{ steps.base-version.outputs.base-version }}"
           PR_VERSION="${{ steps.pr-version.outputs.pr-version }}"
-          
+
           # Parse version components
           IFS='.' read -r BASE_MAJOR BASE_MINOR BASE_PATCH <<< "$BASE_VERSION"
-          
+
           # Check if PR version exists and is valid
           if [ -n "$PR_VERSION" ] && [[ "$PR_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             IFS='.' read -r PR_MAJOR PR_MINOR PR_PATCH <<< "$PR_VERSION"
@@ -74,8 +80,13 @@ jobs:
               echo "new-version=$PR_VERSION" >> $GITHUB_OUTPUT
               exit 0
             fi
+            
+            # If PR version equals base version, we need to increment (e.g., after a rebase)
+            if [ "$PR_MAJOR" -eq "$BASE_MAJOR" ] && [ "$PR_MINOR" -eq "$BASE_MINOR" ] && [ "$PR_PATCH" -eq "$BASE_PATCH" ]; then
+              echo "PR version equals base version (likely after rebase), incrementing..."
+            fi
           fi
-          
+
           # Increment patch version
           NEW_PATCH=$((BASE_PATCH + 1))
           NEW_VERSION="${BASE_MAJOR}.${BASE_MINOR}.${NEW_PATCH}"
@@ -87,22 +98,19 @@ jobs:
         if: steps.version-check.outputs.needs-increment == 'true'
         run: |
           NEW_VERSION="${{ steps.version-check.outputs.new-version }}"
-          
+
           # Update VERSION file
           echo "$NEW_VERSION" > VERSION
-          
-          # Update main.go - handle both spaces and tabs
+
+          # Update main.go Swagger annotation - handle both spaces and tabs
+          # Note: The actual version in code uses a variable set via ldflags at build time
           sed -i.bak "s/@version[[:space:]]*[0-9]\+\.[0-9]\+\.[0-9]\+/@version         $NEW_VERSION/" main.go
           rm -f main.go.bak
-          
-          # Update health.go
-          sed -i.bak "s/Version:[[:space:]]*\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/Version:   \"$NEW_VERSION\"/" internal/api/handlers/health.go
-          rm -f internal/api/handlers/health.go.bak
-          
+
           echo "Updated version to $NEW_VERSION in:"
           echo "  - VERSION"
-          echo "  - main.go"
-          echo "  - internal/api/handlers/health.go"
+          echo "  - main.go (Swagger annotation)"
+          echo "Note: Version in health.go is set via ldflags at build time"
 
       - name: Check for changes
         if: steps.version-check.outputs.needs-increment == 'true'
@@ -119,18 +127,69 @@ jobs:
           fi
 
       - name: Commit and push version update
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'
         run: |
-          git add VERSION main.go internal/api/handlers/health.go docs/
+          git add VERSION main.go docs/
           git commit -m "chore: auto-increment version to ${{ steps.version-check.outputs.new-version }} [skip ci]"
           # Use force push with lease to avoid conflicts, but only if needed
-          git push origin ${{ github.event.pull_request.head.ref }} || \
-            (git pull --rebase origin ${{ github.event.pull_request.head.ref }} && \
-             git push origin ${{ github.event.pull_request.head.ref }})
+          git push origin ${{ env.PR_HEAD_REF }} || \
+            (git pull --rebase origin ${{ env.PR_HEAD_REF }} && \
+             git push origin ${{ env.PR_HEAD_REF }})
+
+      - name: Add version label to PR
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = '${{ steps.version-check.outputs.new-version }}';
+            const versionLabel = `v${version}`;
+
+            // Get current labels
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const currentLabels = issue.labels.map(label => label.name);
+
+            // Remove any existing version labels (format: vX.Y.Z)
+            const versionLabelPattern = /^v\d+\.\d+\.\d+$/;
+            const labelsToRemove = currentLabels.filter(label => versionLabelPattern.test(label));
+
+            // Remove old version labels
+            for (const label of labelsToRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: label,
+                });
+                console.log(`Removed old version label: ${label}`);
+              } catch (error) {
+                console.log(`Could not remove label ${label}:`, error.message);
+              }
+            }
+
+            // Add new version label
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [versionLabel],
+              });
+              console.log(`✅ Added version label: ${versionLabel}`);
+            } catch (error) {
+              console.log(`Could not add label ${versionLabel}:`, error.message);
+            }
 
       - name: Comment on PR (version incremented)
         if: steps.version-check.outputs.needs-increment == 'true' && steps.changes.outputs.has-changes == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -140,12 +199,12 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.data.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Version Auto-incremented')
             );
-            
+
             if (!botComment) {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
@@ -157,8 +216,9 @@ jobs:
 
             Updated files:
             - \`VERSION\`
-            - \`main.go\`
-            - \`internal/api/handlers/health.go\`
+            - \`main.go\` (Swagger annotation)
+
+            Note: Version in \`health.go\` is set via ldflags at build time from the \`VERSION\` file.
 
             This commit will be automatically included in your PR.`
               });
@@ -166,7 +226,7 @@ jobs:
 
       - name: Comment on PR (no increment needed)
         if: steps.version-check.outputs.needs-increment == 'false'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -176,12 +236,12 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.data.find(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Version Check')
             );
-            
+
             if (!botComment) {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,

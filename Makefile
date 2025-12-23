@@ -15,7 +15,8 @@ test-integration:
 
 # Build the binary
 build:
-	go build -o omni-api main.go
+	@VERSION=$$(cat VERSION 2>/dev/null || echo "dev"); \
+	go build -ldflags "-X github.com/jubblin/omni-api/internal/api/handlers.Version=$$VERSION -X github.com/jubblin/omni-api/main.Version=$$VERSION" -o omni-api main.go
 
 # Run the application
 run:
