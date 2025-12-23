@@ -12,6 +12,10 @@ import (
 	"github.com/siderolabs/omni/client/pkg/omni/resources/omni"
 )
 
+// Version is the application version, set at build time
+// This should be set via ldflags when building
+var Version = "dev"
+
 // HealthResponse represents the health status of the API
 type HealthResponse struct {
 	Status    string            `json:"status"`
@@ -64,7 +68,7 @@ func (h *HealthHandler) GetHealth(c *gin.Context) {
 	resp := HealthResponse{
 		Status:    status,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Version:   "0.0.6",
+		Version:   Version,
 		Omni:      omniHealth,
 		Links: map[string]string{
 			"self":    buildURL(c, "/health"),
