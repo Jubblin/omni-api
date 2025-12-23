@@ -81,7 +81,7 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 
 ### dependabot-recreate.yml
 
-**Purpose**: Automatically recreates Dependabot pull requests when the destination branch (main/master) is updated.
+**Purpose**: Automatically rebases Dependabot pull requests when the destination branch (main/master) is updated.
 
 **Triggers**:
 
@@ -90,8 +90,8 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 **Features**:
 
 - ✅ Automatically finds all open Dependabot PRs
-- ✅ Recreates PRs by commenting `@dependabot recreate`
-- ✅ Prevents duplicate comments (checks for recent recreate comments)
+- ✅ Rebases PRs by commenting `@dependabot rebase` (less disruptive than recreate)
+- ✅ Prevents duplicate comments (checks for recent rebase/recreate comments)
 - ✅ Handles rate limiting with delays between requests
 - ✅ Logs all actions for debugging
 
@@ -100,10 +100,10 @@ This directory contains GitHub Actions workflows for building, testing, and secu
 1. Triggers when code is pushed to `main` or `master`
 2. Lists all open pull requests targeting the updated branch
 3. Filters for Dependabot PRs (bot user)
-4. Comments `@dependabot recreate` on each PR
-5. Dependabot recreates the PR with the latest base branch changes
+4. Comments `@dependabot rebase` on each PR
+5. Dependabot rebases the PR with the latest base branch changes
 
-**Note**: This works in conjunction with `rebase-strategy: "auto"` in `dependabot.yml` to ensure PRs stay up-to-date with the destination branch.
+**Note**: This works in conjunction with `rebase-strategy: "auto"` in `dependabot.yml` to ensure PRs stay up-to-date with the destination branch. The workflow uses `@dependabot rebase` instead of `@dependabot recreate` to avoid recreating the entire PR, which is less disruptive.
 
 ### security-scan.yml
 
