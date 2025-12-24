@@ -1,251 +1,874 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"log"
-	"net/http"
 	"os"
-	"time"
+	"sort"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 
-	_ "github.com/jubblin/omni-api/docs"
-	"github.com/jubblin/omni-api/internal/api/handlers"
+	"github.com/cosi-project/runtime/pkg/resource"
+	"github.com/cosi-project/runtime/pkg/state"
+	"github.com/siderolabs/omni/client/pkg/client"
+	omniresources "github.com/siderolabs/omni/client/pkg/omni/resources"
+	"github.com/siderolabs/omni/client/pkg/omni/resources/omni"
+
 	omniclient "github.com/jubblin/omni-api/internal/client"
+	"github.com/jubblin/omni-api/internal/i18n"
+	resconverter "github.com/jubblin/omni-api/internal/resource"
 )
 
 // Version is set at build time via ldflags
-// Default value if not set during build
 var Version = "dev"
 
-// @title           Talos Omni Control API
-// @version         0.0.5
-// @description     A REST API to interface with Sidero Omni.
-// @termsOfService  http://swagger.io/terms/
+const (
+	clusterNodePrefixMachineSets     = "machinesets-"
+	clusterNodePrefixClusterMachines = "clustermachines-"
+	labelKeyMachineSet               = "omni.sidero.dev/machine-set"
+)
 
-// @contact.name   API Support
-// @contact.url    http://www.swagger.io/support
-// @contact.email  support@swagger.io
+type ResourceQuery struct {
+	Type   resource.Type
+	IsList bool
+}
 
-// @license.name  MIT
-// @license.url   https://opensource.org/licenses/MIT
+type TreeNode struct {
+	ID       widget.TreeNodeID
+	Type     string
+	Label    string
+	Resource map[string]interface{}
+	Children []*TreeNode
+}
 
-// @host      localhost:8080
-// @BasePath  /api/v1
+type AppState struct {
+	stateClient              state.State
+	selectedResourceType     string
+	treeRoot                 *TreeNode
+	resourceTree             *widget.Tree
+	resourceIDInput          *widget.Entry
+	statusLabel              *widget.Label
+	detailTitle              *widget.Label
+	detailText               *widget.RichText
+	currentResource          map[string]interface{}
+	machineLinksContainer    *fyne.Container
+	versionLinksContainer    *fyne.Container
+	machineSetLinksContainer *fyne.Container
+	machineRelatedLinksContainer *fyne.Container
+}
 
-func main() {
-	// Initialize Omni client
-	client, err := omniclient.NewOmniClient()
-	if err != nil {
-		log.Fatalf("Failed to create Omni client: %v", err)
-	}
-	defer client.Close()
+type DetailComponents struct {
+	Title              *widget.Label
+	Text               *widget.RichText
+	MachineLinks       *fyne.Container
+	VersionLinks       *fyne.Container
+	MachineSetLinks    *fyne.Container
+	MachineRelatedLinks *fyne.Container
+}
 
-	r := gin.Default()
+type ResourceContext struct {
+	AppState    *AppState
+	StateClient state.State
+	Ctx         context.Context
+	Depth       int
+}
 
-	// CORS middleware
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
-
-	// Middleware to record metrics
-	r.Use(func(c *gin.Context) {
-		start := time.Now()
-		c.Next()
-		duration := time.Since(start)
-		handlers.RecordRequest(c.FullPath(), duration, c.Writer.Status())
-	})
-
-	// Handlers
-	clusterHandler := handlers.NewClusterHandler(client.Omni().State())
-	machineHandler := handlers.NewMachineHandler(client.Omni().State())
-	machineStatusHandler := handlers.NewMachineStatusHandler(client.Omni().State())
-	machineLabelsHandler := handlers.NewMachineLabelsHandler(client.Omni().State())
-	machineExtensionsHandler := handlers.NewMachineExtensionsHandler(client.Omni().State())
-	machineUpgradeStatusHandler := handlers.NewMachineUpgradeStatusHandler(client.Omni().State())
-	machineStatusMetricsHandler := handlers.NewMachineStatusMetricsHandler(client.Omni().State())
-	machineSetHandler := handlers.NewMachineSetHandler(client.Omni().State())
-	machineSetStatusHandler := handlers.NewMachineSetStatusHandler(client.Omni().State())
-	configPatchHandler := handlers.NewConfigPatchHandler(client.Omni().State())
-	clusterMachineHandler := handlers.NewClusterMachineHandler(client.Omni().State())
-	clusterMachineStatusHandler := handlers.NewClusterMachineStatusHandler(client.Omni().State())
-	clusterMachineConfigStatusHandler := handlers.NewClusterMachineConfigStatusHandler(client.Omni().State())
-	clusterMachineTalosVersionHandler := handlers.NewClusterMachineTalosVersionHandler(client.Omni().State())
-	kubeconfigHandler := handlers.NewKubeconfigHandler(client.Omni().State())
-	kubernetesUpgradeHandler := handlers.NewKubernetesUpgradeHandler(client.Omni().State())
-	clusterEndpointHandler := handlers.NewClusterEndpointHandler(client.Omni().State())
-	etcdBackupHandler := handlers.NewEtcdBackupHandler(client.Omni().State())
-	machineClassHandler := handlers.NewMachineClassHandler(client.Omni().State())
-	machineSetNodeHandler := handlers.NewMachineSetNodeHandler(client.Omni().State())
-	talosUpgradeHandler := handlers.NewTalosUpgradeHandler(client.Omni().State())
-	schematicHandler := handlers.NewSchematicHandler(client.Omni().State())
-	ongoingTaskHandler := handlers.NewOngoingTaskHandler(client.Omni().State())
-	kubernetesStatusHandler := handlers.NewKubernetesStatusHandler(client.Omni().State())
-	clusterKubernetesNodesHandler := handlers.NewClusterKubernetesNodesHandler(client.Omni().State())
-	kubernetesVersionHandler := handlers.NewKubernetesVersionHandler(client.Omni().State())
-	clusterMachineConfigHandler := handlers.NewClusterMachineConfigHandler(client.Omni().State())
-	controlPlaneStatusHandler := handlers.NewControlPlaneStatusHandler(client.Omni().State())
-	etcdBackupStatusHandler := handlers.NewEtcdBackupStatusHandler(client.Omni().State())
-	etcdManualBackupHandler := handlers.NewEtcdManualBackupHandler(client.Omni().State())
-	schematicConfigurationHandler := handlers.NewSchematicConfigurationHandler(client.Omni().State())
-	extensionsConfigurationHandler := handlers.NewExtensionsConfigurationHandler(client.Omni().State())
-	kernelArgsHandler := handlers.NewKernelArgsHandler(client.Omni().State())
-	loadBalancerConfigHandler := handlers.NewLoadBalancerConfigHandler(client.Omni().State())
-	loadBalancerStatusHandler := handlers.NewLoadBalancerStatusHandler(client.Omni().State())
-	exposedServiceHandler := handlers.NewExposedServiceHandler(client.Omni().State())
-	machineRequestSetHandler := handlers.NewMachineRequestSetHandler(client.Omni().State())
-	clusterDiagnosticsHandler := handlers.NewClusterDiagnosticsHandler(client.Omni().State())
-	clusterDestroyStatusHandler := handlers.NewClusterDestroyStatusHandler(client.Omni().State())
-	machineSetDestroyStatusHandler := handlers.NewMachineSetDestroyStatusHandler(client.Omni().State())
-	clusterWorkloadProxyStatusHandler := handlers.NewClusterWorkloadProxyStatusHandler(client.Omni().State())
-	imagePullRequestHandler := handlers.NewImagePullRequestHandler(client.Omni().State())
-	imagePullStatusHandler := handlers.NewImagePullStatusHandler(client.Omni().State())
-	installationMediaHandler := handlers.NewInstallationMediaHandler(client.Omni().State())
-	infraMachineConfigHandler := handlers.NewInfraMachineConfigHandler(client.Omni().State())
-	machineConfigDiffHandler := handlers.NewMachineConfigDiffHandler(client.Omni().State())
-	healthHandler := handlers.NewHealthHandler(client.Omni().State())
-	metricsHandler := handlers.NewMetricsHandler()
-
-	// Health and Metrics routes (outside v1 group for easier access)
-	r.GET("/health", healthHandler.GetHealth)
-	r.GET("/metrics", metricsHandler.GetMetrics)
-
-	// API Routes
-	v1 := r.Group("/api/v1")
-	{
-		// Cluster routes
-		v1.GET("/clusters", clusterHandler.ListClusters)
-		v1.GET("/clusters/:id", clusterHandler.GetCluster)
-		v1.GET("/clusters/:id/status", clusterHandler.GetClusterStatus)
-		v1.GET("/clusters/:id/metrics", clusterHandler.GetClusterMetrics)
-		v1.GET("/clusters/:id/bootstrap", clusterHandler.GetClusterBootstrap)
-		v1.GET("/clusters/:id/kubeconfig", kubeconfigHandler.GetKubeconfig)
-		v1.GET("/clusters/:id/kubernetes-upgrade", kubernetesUpgradeHandler.GetKubernetesUpgradeStatus)
-		v1.GET("/clusters/:id/talos-upgrade", talosUpgradeHandler.GetTalosUpgradeStatus)
-		v1.GET("/clusters/:id/endpoints", clusterEndpointHandler.GetClusterEndpoints)
-		v1.GET("/clusters/:id/kubernetes-status", kubernetesStatusHandler.GetKubernetesStatus)
-		v1.GET("/clusters/:id/kubernetes-nodes", clusterKubernetesNodesHandler.ListClusterKubernetesNodes)
-		v1.GET("/clusters/:id/kubernetes-nodes/:node", clusterKubernetesNodesHandler.GetClusterKubernetesNode)
-		v1.GET("/clusters/:id/controlplane-status", controlPlaneStatusHandler.GetControlPlaneStatus)
-		v1.GET("/clusters/:id/diagnostics", clusterDiagnosticsHandler.GetClusterDiagnostics)
-		v1.GET("/clusters/:id/destroy-status", clusterDestroyStatusHandler.GetClusterDestroyStatus)
-		v1.GET("/clusters/:id/workload-proxy-status", clusterWorkloadProxyStatusHandler.GetClusterWorkloadProxyStatus)
-		
-		// Machine routes
-		v1.GET("/machines", machineHandler.ListMachines)
-		v1.GET("/machines/:id", machineHandler.GetMachine)
-		v1.GET("/machines/:id/status", machineStatusHandler.GetMachineStatus)
-		v1.GET("/machines/:id/labels", machineLabelsHandler.GetMachineLabels)
-		v1.GET("/machines/:id/extensions", machineExtensionsHandler.GetMachineExtensions)
-		v1.GET("/machines/:id/upgrade-status", machineUpgradeStatusHandler.GetMachineUpgradeStatus)
-		v1.GET("/machines/:id/metrics", machineStatusMetricsHandler.GetMachineStatusMetrics)
-		v1.GET("/machines/:id/config-diff", machineConfigDiffHandler.GetMachineConfigDiff)
-		
-		// MachineSet routes
-		v1.GET("/machinesets", machineSetHandler.ListMachineSets)
-		v1.GET("/machinesets/:id", machineSetHandler.GetMachineSet)
-		v1.GET("/machinesets/:id/status", machineSetStatusHandler.GetMachineSetStatus)
-		v1.GET("/machinesets/:id/destroy-status", machineSetDestroyStatusHandler.GetMachineSetDestroyStatus)
-		
-		// MachineSetNode routes
-		v1.GET("/machinesetnodes", machineSetNodeHandler.ListMachineSetNodes)
-		v1.GET("/machinesetnodes/:id", machineSetNodeHandler.GetMachineSetNode)
-		
-		// ConfigPatch routes
-		v1.GET("/configpatches", configPatchHandler.ListConfigPatches)
-		v1.GET("/configpatches/:id", configPatchHandler.GetConfigPatch)
-		
-		// ClusterMachine routes
-		v1.GET("/clustermachines", clusterMachineHandler.ListClusterMachines)
-		v1.GET("/clustermachines/:id", clusterMachineHandler.GetClusterMachine)
-		v1.GET("/clustermachines/:id/status", clusterMachineStatusHandler.GetClusterMachineStatus)
-		v1.GET("/clustermachines/:id/config-status", clusterMachineConfigStatusHandler.GetClusterMachineConfigStatus)
-		v1.GET("/clustermachines/:id/talos-version", clusterMachineTalosVersionHandler.GetClusterMachineTalosVersion)
-		v1.GET("/clustermachines/:id/config", clusterMachineConfigHandler.GetClusterMachineConfig)
-		
-		// MachineClass routes
-		v1.GET("/machineclasses", machineClassHandler.ListMachineClasses)
-		v1.GET("/machineclasses/:id", machineClassHandler.GetMachineClass)
-		
-		// EtcdBackup routes
-		v1.GET("/etcdbackups", etcdBackupHandler.ListEtcdBackups)
-		v1.GET("/etcdbackups/:id", etcdBackupHandler.GetEtcdBackup)
-		v1.GET("/etcdbackups/:id/status", etcdBackupStatusHandler.GetEtcdBackupStatus)
-		v1.GET("/etcd-manual-backups", etcdManualBackupHandler.ListEtcdManualBackups)
-		v1.GET("/etcd-manual-backups/:id", etcdManualBackupHandler.GetEtcdManualBackup)
-		
-		// Schematic routes
-		v1.GET("/schematics", schematicHandler.ListSchematics)
-		v1.GET("/schematics/:id", schematicHandler.GetSchematic)
-		v1.GET("/schematic-configurations", schematicConfigurationHandler.ListSchematicConfigurations)
-		v1.GET("/schematic-configurations/:id", schematicConfigurationHandler.GetSchematicConfiguration)
-		
-		// OngoingTask routes
-		v1.GET("/ongoingtasks", ongoingTaskHandler.ListOngoingTasks)
-		v1.GET("/ongoingtasks/:id", ongoingTaskHandler.GetOngoingTask)
-		
-		// Kubernetes Version routes
-		v1.GET("/kubernetes-versions", kubernetesVersionHandler.ListKubernetesVersions)
-		v1.GET("/kubernetes-versions/:id", kubernetesVersionHandler.GetKubernetesVersion)
-		
-		// Extensions Configuration routes
-		v1.GET("/extensions-configurations", extensionsConfigurationHandler.ListExtensionsConfigurations)
-		v1.GET("/extensions-configurations/:id", extensionsConfigurationHandler.GetExtensionsConfiguration)
-		
-		// Kernel Args routes
-		v1.GET("/kernel-args", kernelArgsHandler.ListKernelArgs)
-		v1.GET("/kernel-args/:id", kernelArgsHandler.GetKernelArgs)
-		
-		// Load Balancer routes
-		v1.GET("/loadbalancer-configs", loadBalancerConfigHandler.ListLoadBalancerConfigs)
-		v1.GET("/loadbalancer-configs/:id", loadBalancerConfigHandler.GetLoadBalancerConfig)
-		v1.GET("/loadbalancers/:id/status", loadBalancerStatusHandler.GetLoadBalancerStatus)
-		
-		// Exposed Service routes
-		v1.GET("/exposed-services", exposedServiceHandler.ListExposedServices)
-		v1.GET("/exposed-services/:id", exposedServiceHandler.GetExposedService)
-		
-		// Machine Request Set routes
-		v1.GET("/machine-request-sets", machineRequestSetHandler.ListMachineRequestSets)
-		v1.GET("/machine-request-sets/:id", machineRequestSetHandler.GetMachineRequestSet)
-		
-		// Image Pull Request routes
-		v1.GET("/image-pull-requests", imagePullRequestHandler.ListImagePullRequests)
-		v1.GET("/image-pull-requests/:id", imagePullRequestHandler.GetImagePullRequest)
-		v1.GET("/image-pull-requests/:id/status", imagePullStatusHandler.GetImagePullStatus)
-		
-		// Installation Media routes
-		v1.GET("/installation-medias", installationMediaHandler.ListInstallationMedias)
-		v1.GET("/installation-medias/:id", installationMediaHandler.GetInstallationMedia)
-		
-		// Infrastructure Machine Config routes
-		v1.GET("/infra-machine-configs", infraMachineConfigHandler.ListInfraMachineConfigs)
-		v1.GET("/infra-machine-configs/:id", infraMachineConfigHandler.GetInfraMachineConfig)
-	}
-
-	// Redirect root to Swagger UI
-	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
-	})
-
-	// Swagger UI
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("Starting server on port %s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("Failed to run server: %v", err)
+func getResourceQueries() map[string]ResourceQuery {
+	return map[string]ResourceQuery{
+		i18n.T("resource.cluster"): {
+			Type:   omni.ClusterType,
+			IsList: true,
+		},
+		i18n.T("resource.cluster_machines"): {
+			Type:   omni.ClusterMachineType,
+			IsList: true,
+		},
+		i18n.T("resource.etcd_backups"): {
+			Type:   omni.EtcdBackupType,
+			IsList: true,
+		},
+		i18n.T("resource.kubernetes_versions"): {
+			Type:   omni.KubernetesVersionType,
+			IsList: true,
+		},
+		i18n.T("resource.machine"): {
+			Type:   omni.MachineType,
+			IsList: true,
+		},
+		i18n.T("resource.machine_classes"): {
+			Type:   omni.MachineClassType,
+			IsList: true,
+		},
+		i18n.T("resource.machine_set"): {
+			Type:   omni.MachineSetType,
+			IsList: true,
+		},
+		i18n.T("resource.ongoing_tasks"): {
+			Type:   omni.OngoingTaskType,
+			IsList: true,
+		},
+		i18n.T("resource.schematics"): {
+			Type:   omni.SchematicType,
+			IsList: true,
+		},
 	}
 }
 
+func initializeApp(myWindow fyne.Window) (*client.Client, *AppState) {
+	omniClient, err := omniclient.NewOmniClient()
+	if err != nil {
+		log.Printf("Failed to create Omni client: %v", err)
+		// Format directive is in translation file: "app.error.client" = "Error: %v\n\nPlease set OMNI_ENDPOINT..."
+		errorLabel := widget.NewLabel(i18n.T("app.error.client", err)) //nolint
+		errorLabel.Wrapping = fyne.TextWrapWord
+		myWindow.SetContent(container.NewScroll(errorLabel))
+		return nil, nil
+	}
+
+	appState := &AppState{
+		stateClient: omniClient.Omni().State(),
+		treeRoot: &TreeNode{
+			ID:       "",
+			Type:     "root",
+			Label:    i18n.T("tree.root"),
+			Children: []*TreeNode{},
+		},
+	}
+
+	return omniClient, appState
+}
+
+func createResourceIDInput() *widget.Entry {
+	entry := widget.NewEntry()
+	entry.SetPlaceHolder(i18n.T("resource.id.placeholder"))
+	return entry
+}
+
+func createResourceTree(appState *AppState) *widget.Tree {
+	tree := widget.NewTree(
+		func(id widget.TreeNodeID) []widget.TreeNodeID {
+			return getNodeChildren(id, appState)
+		},
+		func(id widget.TreeNodeID) bool {
+			return isBranch(id, appState)
+		},
+		func(branch bool) fyne.CanvasObject {
+			return widget.NewLabel("")
+		},
+		func(id widget.TreeNodeID, branch bool, obj fyne.CanvasObject) {
+			label := obj.(*widget.Label)
+			node := getNodeByID(id, appState)
+			if node != nil {
+				label.SetText(node.Label)
+			}
+		},
+	)
+	return tree
+}
+
+func getNodeChildren(id widget.TreeNodeID, appState *AppState) []widget.TreeNodeID {
+	if id == "" {
+		if appState.treeRoot == nil {
+			return []widget.TreeNodeID{}
+		}
+		children := make([]widget.TreeNodeID, 0, len(appState.treeRoot.Children))
+		for _, child := range appState.treeRoot.Children {
+			children = append(children, child.ID)
+		}
+		return children
+	}
+
+	node := getNodeByID(id, appState)
+	if node == nil {
+		return []widget.TreeNodeID{}
+	}
+
+	children := make([]widget.TreeNodeID, 0, len(node.Children))
+	for _, child := range node.Children {
+		children = append(children, child.ID)
+	}
+	return children
+}
+
+func isBranch(id widget.TreeNodeID, appState *AppState) bool {
+	node := getNodeByID(id, appState)
+	if node == nil {
+		return false
+	}
+	return len(node.Children) > 0
+}
+
+func getNodeByID(id widget.TreeNodeID, appState *AppState) *TreeNode {
+	if id == "" {
+		return appState.treeRoot
+	}
+	return findNodeRecursive(appState.treeRoot, id)
+}
+
+func findNodeRecursive(node *TreeNode, id widget.TreeNodeID) *TreeNode {
+	if node.ID == id {
+		return node
+	}
+	for _, child := range node.Children {
+		if found := findNodeRecursive(child, id); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func setupTreeSelection(resourceTree *widget.Tree, appState *AppState) {
+	resourceTree.OnSelected = func(id widget.TreeNodeID) {
+		node := getNodeByID(id, appState)
+		if node != nil && node.Resource != nil {
+			updateDetailPane(node.Resource, appState)
+		}
+	}
+}
+
+func createDetailComponents() *DetailComponents {
+	title := widget.NewLabel(i18n.T("tree.select_resource"))
+	title.TextStyle = fyne.TextStyle{Bold: true}
+
+	text := widget.NewRichText()
+	text.Wrapping = fyne.TextWrapWord
+
+	return &DetailComponents{
+		Title:               title,
+		Text:                text,
+		MachineLinks:        container.NewVBox(),
+		VersionLinks:        container.NewVBox(),
+		MachineSetLinks:     container.NewVBox(),
+		MachineRelatedLinks: container.NewVBox(),
+	}
+}
+
+func setupAppState(appState *AppState, resourceTree *widget.Tree, resourceIDInput *widget.Entry, statusLabel *widget.Label, detailComponents *DetailComponents) {
+	appState.detailText = detailComponents.Text
+	appState.detailTitle = detailComponents.Title
+	appState.resourceTree = resourceTree
+	appState.resourceIDInput = resourceIDInput
+	appState.statusLabel = statusLabel
+	appState.machineLinksContainer = detailComponents.MachineLinks
+	appState.versionLinksContainer = detailComponents.VersionLinks
+	appState.machineSetLinksContainer = detailComponents.MachineSetLinks
+	appState.machineRelatedLinksContainer = detailComponents.MachineRelatedLinks
+}
+
+func createBurgerMenu(myWindow fyne.Window, appState *AppState, executeQuery func()) *widget.Button {
+	resourceQueries := getResourceQueries()
+	resourceOptions := make([]string, 0, len(resourceQueries))
+	for name := range resourceQueries {
+		resourceOptions = append(resourceOptions, name)
+	}
+	sort.Strings(resourceOptions)
+
+	menuItems := make([]*fyne.MenuItem, 0, len(resourceOptions))
+	for _, name := range resourceOptions {
+		name := name
+		menuItems = append(menuItems, fyne.NewMenuItem(name, func() {
+			appState.selectedResourceType = name
+			executeQuery()
+		}))
+	}
+
+	menu := fyne.NewMenu(i18n.T("resource.type.menu"), menuItems...)
+	burgerMenu := widget.NewButton(fmt.Sprintf("☰ %s", appState.selectedResourceType), nil)
+	
+	burgerMenu.OnTapped = func() {
+		popup := widget.NewPopUpMenu(menu, fyne.CurrentApp().Driver().CanvasForObject(burgerMenu))
+		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(burgerMenu)
+		popup.ShowAtPosition(pos.Add(fyne.NewPos(0, burgerMenu.Size().Height)))
+	}
+
+	return burgerMenu
+}
+
+func createLanguageSelector(appState *AppState, refreshUI func()) *widget.Select {
+	languages := i18n.GetSupportedLanguages()
+	options := make([]string, 0, len(languages))
+	for _, lang := range languages {
+		options = append(options, i18n.GetLanguageName(lang))
+	}
+
+	langSelect := widget.NewSelect(options, func(selected string) {
+		for _, lang := range languages {
+			if i18n.GetLanguageName(lang) == selected {
+				if err := i18n.SetLanguage(lang); err == nil {
+					refreshUI()
+				}
+				break
+			}
+		}
+	})
+
+	currentLang := i18n.GetCurrentLanguage()
+	langSelect.SetSelected(i18n.GetLanguageName(currentLang))
+
+	return langSelect
+}
+
+func createMainLayout(burgerMenu *widget.Button, resourceIDInput *widget.Entry, resourceTree *widget.Tree, detailComponents *DetailComponents, statusLabel *widget.Label, langSelect *widget.Select) *container.Split {
+	topBar := container.NewBorder(nil, nil, nil, langSelect, burgerMenu)
+	middleBar := container.NewBorder(nil, nil, widget.NewLabel(i18n.T("resource.id.label")), nil, resourceIDInput)
+	// Format directive is in translation file: "app.connected" = "Connected to: %s"
+	infoLabel := widget.NewLabel(i18n.T("app.connected", os.Getenv("OMNI_ENDPOINT"))) //nolint
+	infoLabel.Wrapping = fyne.TextWrapWord
+
+	leftPane := container.NewBorder(topBar, middleBar, nil, nil, resourceTree)
+	
+	detailScroll := container.NewScroll(container.NewVBox(
+		detailComponents.Title,
+		detailComponents.Text,
+		detailComponents.MachineLinks,
+		detailComponents.VersionLinks,
+		detailComponents.MachineSetLinks,
+		detailComponents.MachineRelatedLinks,
+	))
+	detailScroll.SetMinSize(fyne.NewSize(400, 0))
+
+	rightPane := container.NewBorder(nil, statusLabel, nil, nil, detailScroll)
+	
+	split := container.NewHSplit(leftPane, rightPane)
+	split.SetOffset(0.3)
+
+	return split
+}
+
+func createExecuteQueryFunc(appState *AppState, resourceIDInput *widget.Entry, statusLabel *widget.Label, stateClient state.State) func() {
+	return func() {
+		resourceQueries := getResourceQueries()
+		query, ok := resourceQueries[appState.selectedResourceType]
+		if !ok {
+			statusLabel.SetText(i18n.T("resource.type.unknown"))
+			return
+		}
+
+		statusLabel.SetText(i18n.T("resource.querying"))
+		ctx := context.Background()
+
+		if query.IsList {
+			executeListQuery(ctx, query.Type, appState, stateClient, statusLabel)
+		} else {
+			resourceID := resourceIDInput.Text
+			if resourceID == "" {
+				statusLabel.SetText(i18n.T("resource.id.required"))
+				return
+			}
+			executeGetQuery(ctx, query.Type, resourceID, appState, stateClient, statusLabel)
+		}
+	}
+}
+
+func executeListQuery(ctx context.Context, resourceType resource.Type, appState *AppState, stateClient state.State, statusLabel *widget.Label) {
+	md := resource.NewMetadata(omniresources.DefaultNamespace, resourceType, "", resource.VersionUndefined)
+	list, err := stateClient.List(ctx, md)
+	if err != nil {
+		handleQueryError(err, appState, statusLabel)
+		return
+	}
+
+	resources := make([]map[string]interface{}, 0, len(list.Items))
+	for _, item := range list.Items {
+		resources = append(resources, resconverter.ToMap(item))
+	}
+
+	appState.treeRoot.Children = buildResourceNodes(resources, stateClient, ctx)
+	appState.resourceTree.Refresh()
+	statusLabel.SetText(i18n.T("resource.success", fmt.Sprintf("%d resources", len(resources))))
+}
+
+func executeGetQuery(ctx context.Context, resourceType resource.Type, resourceID string, appState *AppState, stateClient state.State, statusLabel *widget.Label) {
+	md := resource.NewMetadata(omniresources.DefaultNamespace, resourceType, resourceID, resource.VersionUndefined)
+	item, err := stateClient.Get(ctx, md)
+	if err != nil {
+		handleQueryError(err, appState, statusLabel)
+		return
+	}
+
+	resourceMap := resconverter.ToMap(item)
+	appState.treeRoot.Children = []*TreeNode{
+		{
+			ID:       fmt.Sprintf("%s-%s", resourceType, resourceID),
+			Type:     string(resourceType),
+			Label:    formatResourceLabel(resourceMap),
+			Resource: resourceMap,
+			Children: []*TreeNode{},
+		},
+	}
+	appState.resourceTree.Refresh()
+	statusLabel.SetText(i18n.T("resource.success", resourceID))
+}
+
+func handleQueryError(err error, appState *AppState, statusLabel *widget.Label) {
+	// Format directive is in translation file: "resource.error" = "Error: %v"
+	statusLabel.SetText(i18n.T("resource.error", err)) //nolint
+	appState.treeRoot.Children = []*TreeNode{}
+	appState.resourceTree.Refresh()
+}
+
+func setupResourceIDAutoQuery(resourceIDInput *widget.Entry, appState *AppState, executeQuery func()) {
+	resourceIDInput.OnSubmitted = func(_ string) {
+		executeQuery()
+	}
+}
+
+func buildResourceNodes(resources []map[string]interface{}, stateClient state.State, ctx context.Context) []*TreeNode {
+	nodes := make([]*TreeNode, 0, len(resources))
+	for _, resourceMap := range resources {
+		resourceID, resourceType := extractResourceInfoFromMap(resourceMap)
+		enrichMachineResource(resourceMap, resourceType, resourceID, stateClient, ctx, 0)
+		enrichClusterMachineResource(resourceMap, resourceType, resourceID, stateClient, ctx, 0)
+		node := createResourceNodeFromMap(resourceMap, resourceID, resourceType)
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
+func extractResourceInfoFromMap(resourceMap map[string]interface{}) (string, string) {
+	resourceID := ""
+	if id, ok := resourceMap["id"].(string); ok {
+		resourceID = id
+	}
+	resourceType := ""
+	if t, ok := resourceMap["type"].(string); ok {
+		resourceType = t
+	}
+	return resourceID, resourceType
+}
+
+func enrichMachineResource(resourceMap map[string]interface{}, resourceType, resourceID string, stateClient state.State, ctx context.Context, depth int) {
+	if resourceType != string(omni.MachineType) || resourceID == "" || depth > 1 {
+		return
+	}
+
+	md := resource.NewMetadata(omniresources.DefaultNamespace, omni.MachineStatusType, resourceID, resource.VersionUndefined)
+	machineStatus, err := stateClient.Get(ctx, md)
+	if err != nil {
+		return
+	}
+
+	ms, ok := machineStatus.(*omni.MachineStatus)
+	if !ok {
+		return
+	}
+
+	if ms.TypedSpec().Value.Network != nil && ms.TypedSpec().Value.Network.Hostname != "" {
+		resourceMap["hostname"] = ms.TypedSpec().Value.Network.Hostname
+	}
+}
+
+func enrichClusterMachineResource(resourceMap map[string]interface{}, resourceType, resourceID string, stateClient state.State, ctx context.Context, depth int) {
+	if resourceType != string(omni.ClusterMachineType) || resourceID == "" || depth > 1 {
+		return
+	}
+
+	machineID, ok := resourceMap["machine_id"].(string)
+	if !ok || machineID == "" {
+		return
+	}
+
+	md := resource.NewMetadata(omniresources.DefaultNamespace, omni.MachineStatusType, machineID, resource.VersionUndefined)
+	machineStatus, err := stateClient.Get(ctx, md)
+	if err != nil {
+		return
+	}
+
+	ms, ok := machineStatus.(*omni.MachineStatus)
+	if !ok {
+		return
+	}
+
+	if ms.TypedSpec().Value.Network != nil && ms.TypedSpec().Value.Network.Hostname != "" {
+		resourceMap["hostname"] = ms.TypedSpec().Value.Network.Hostname
+	}
+}
+
+func createResourceNodeFromMap(resourceMap map[string]interface{}, resourceID, resourceType string) *TreeNode {
+	label := formatResourceLabel(resourceMap)
+	return &TreeNode{
+		ID:       fmt.Sprintf("%s-%s", resourceType, resourceID),
+		Type:     resourceType,
+		Label:    label,
+		Resource: resourceMap,
+		Children: []*TreeNode{},
+	}
+}
+
+func formatResourceLabel(resourceMap map[string]interface{}) string {
+	resourceID := ""
+	if id, ok := resourceMap["id"].(string); ok {
+		resourceID = id
+	}
+	resourceType := ""
+	if t, ok := resourceMap["type"].(string); ok {
+		resourceType = t
+	}
+
+	label := resourceID
+	switch resourceType {
+	case string(omni.ClusterType):
+		if kv, ok := resourceMap["kubernetes_version"].(string); ok {
+			label = fmt.Sprintf("%s (K8s: %s)", resourceID, kv)
+		}
+	case string(omni.MachineType):
+		if hostname, ok := resourceMap["hostname"].(string); ok && hostname != "" {
+			label = hostname
+		} else if addr, ok := resourceMap["management_address"].(string); ok && addr != "" {
+			label = fmt.Sprintf("%s (%s)", resourceID, addr)
+		}
+	case string(omni.ClusterMachineType):
+		if hostname, ok := resourceMap["hostname"].(string); ok && hostname != "" {
+			label = hostname
+		} else if machineID, ok := resourceMap["machine_id"].(string); ok && machineID != "" {
+			label = fmt.Sprintf("%s (Machine: %s)", resourceID, machineID)
+		}
+	case string(omni.MachineSetType):
+		if mc, ok := resourceMap["machine_class"].(string); ok {
+			label = fmt.Sprintf("%s (Class: %s)", resourceID, mc)
+		}
+	}
+	return label
+}
+
+func updateDetailPane(resourceData map[string]interface{}, appState *AppState) {
+	appState.currentResource = resourceData
+
+	resourceID, resourceType := extractResourceInfo(resourceData)
+	updateDetailTitle(appState, resourceID)
+	displayResource := loadMachineStatusIfNeeded(resourceData, resourceType, resourceID, appState)
+	updateDetailJSON(displayResource, appState)
+	updateDetailLinks(resourceData, resourceType, resourceID, appState)
+}
+
+func extractResourceInfo(resourceData map[string]interface{}) (string, string) {
+	resourceID := ""
+	if id, ok := resourceData["id"].(string); ok {
+		resourceID = id
+	}
+	resourceType := ""
+	if t, ok := resourceData["type"].(string); ok {
+		resourceType = t
+	}
+	return resourceID, resourceType
+}
+
+func updateDetailTitle(appState *AppState, resourceID string) {
+	if resourceID != "" {
+		appState.detailTitle.SetText(fmt.Sprintf("Resource Details: %s", resourceID))
+	} else {
+		appState.detailTitle.SetText("Resource Details")
+	}
+}
+
+func loadMachineStatusIfNeeded(resourceData map[string]interface{}, resourceType, resourceID string, appState *AppState) map[string]interface{} {
+	if resourceType != string(omni.MachineType) || resourceID == "" {
+		return resourceData
+	}
+
+	ctx := context.Background()
+	md := resource.NewMetadata(omniresources.DefaultNamespace, omni.MachineStatusType, resourceID, resource.VersionUndefined)
+	machineStatus, err := appState.stateClient.Get(ctx, md)
+	if err != nil {
+		return resourceData
+	}
+
+	statusMap := resconverter.ToMap(machineStatus)
+	if statusSpec, ok := statusMap["spec"].(map[string]interface{}); ok {
+		resourceData["machine_status"] = statusSpec
+	}
+
+	return resourceData
+}
+
+func updateDetailJSON(resourceData map[string]interface{}, appState *AppState) {
+	jsonBytes, err := json.MarshalIndent(resourceData, "", "  ")
+	if err != nil {
+		appState.detailText.ParseMarkdown(fmt.Sprintf("Error formatting JSON: %v", err))
+		return
+	}
+	appState.detailText.ParseMarkdown(fmt.Sprintf("```json\n%s\n```", string(jsonBytes)))
+}
+
+func updateDetailLinks(resourceData map[string]interface{}, resourceType, resourceID string, appState *AppState) {
+	clearAllLinkContainers(appState)
+	updateMachineIDLinks(resourceData, appState)
+	updateKubernetesVersionLinks(resourceData, appState)
+	updateMachineSetLinks(resourceData, appState)
+}
+
+func clearAllLinkContainers(appState *AppState) {
+	appState.machineLinksContainer.RemoveAll()
+	appState.versionLinksContainer.RemoveAll()
+	appState.machineSetLinksContainer.RemoveAll()
+	appState.machineRelatedLinksContainer.RemoveAll()
+}
+
+func updateMachineIDLinks(resourceData map[string]interface{}, appState *AppState) {
+	machineIDs := findMachineIDs(resourceData)
+	if len(machineIDs) == 0 {
+		return
+	}
+
+	linksLabel := widget.NewLabel(i18n.T("detail.machine_id.label"))
+	appState.machineLinksContainer.Add(linksLabel)
+	for _, machineID := range machineIDs {
+		// Format directive is in translation file: "detail.machine_id" = "Machine ID: %s"
+		btn := widget.NewButton(i18n.T("detail.machine_id", machineID), func(id string) func() { //nolint
+			return func() {
+				loadMachineByID(id, appState)
+			}
+		}(machineID))
+		appState.machineLinksContainer.Add(btn)
+	}
+}
+
+func findMachineIDs(resourceData map[string]interface{}) []string {
+	var machineIDs []string
+	if machineID, ok := resourceData["machine_id"].(string); ok && machineID != "" {
+		machineIDs = append(machineIDs, machineID)
+	}
+	return machineIDs
+}
+
+func updateKubernetesVersionLinks(resourceData map[string]interface{}, appState *AppState) {
+	k8sVersions := findKubernetesVersions(resourceData)
+	if len(k8sVersions) == 0 {
+		return
+	}
+
+	linksLabel := widget.NewLabel(i18n.T("detail.kubernetes_version.label"))
+	appState.versionLinksContainer.Add(linksLabel)
+	for _, version := range k8sVersions {
+		// Format directive is in translation file: "detail.kubernetes_version" = "Kubernetes Version: %s"
+		btn := widget.NewButton(i18n.T("detail.kubernetes_version", version), func(v string) func() { //nolint
+			return func() {
+				loadResourcesByK8sVersion(v, appState)
+			}
+		}(version))
+		appState.versionLinksContainer.Add(btn)
+	}
+}
+
+func findKubernetesVersions(resourceData map[string]interface{}) []string {
+	var versions []string
+	if version, ok := resourceData["kubernetes_version"].(string); ok && version != "" {
+		versions = append(versions, version)
+	}
+	return versions
+}
+
+func updateMachineSetLinks(resourceData map[string]interface{}, appState *AppState) {
+	machineSetIDs := findMachineSetIDs(resourceData)
+	if len(machineSetIDs) == 0 {
+		return
+	}
+
+	linksLabel := widget.NewLabel(i18n.T("detail.machine_set.label"))
+	appState.machineSetLinksContainer.Add(linksLabel)
+	for _, machineSetID := range machineSetIDs {
+		// Format directive is in translation file: "detail.machine_set" = "Machine Set: %s"
+		btn := widget.NewButton(i18n.T("detail.machine_set", machineSetID), func(id string) func() { //nolint
+			return func() {
+				loadMachinesByMachineSet(id, appState)
+			}
+		}(machineSetID))
+		appState.machineSetLinksContainer.Add(btn)
+	}
+}
+
+func findMachineSetIDs(resourceData map[string]interface{}) []string {
+	var machineSetIDs []string
+	if labels, ok := resourceData["labels"].(map[string]interface{}); ok {
+		if machineSet, ok := labels[labelKeyMachineSet].(string); ok && machineSet != "" {
+			machineSetIDs = append(machineSetIDs, machineSet)
+		}
+	}
+	return machineSetIDs
+}
+
+func loadMachineByID(machineID string, appState *AppState) {
+	ctx := context.Background()
+	md := resource.NewMetadata(omniresources.DefaultNamespace, omni.MachineType, machineID, resource.VersionUndefined)
+
+	machine, err := appState.stateClient.Get(ctx, md)
+	if err != nil {
+		// Format directives are in translation file: "machine.error.extensions" = "Error loading extensions for machine %s: %v"
+		appState.statusLabel.SetText(i18n.T("machine.error.extensions", machineID, err)) //nolint
+		return
+	}
+
+	machineMap := resconverter.ToMap(machine)
+	updateDetailPane(machineMap, appState)
+	// Format directive is in translation file: "machine.loaded" = "Loaded machine: %s"
+	appState.statusLabel.SetText(i18n.T("machine.loaded", machineID)) //nolint
+}
+
+func loadMachinesByMachineSet(machineSetID string, appState *AppState) {
+	ctx := context.Background()
+	resources := findClusterMachinesByMachineSet(ctx, machineSetID, appState)
+
+	if len(resources) == 0 {
+		// Format directive is in translation file: "machineset.not_found" = "No machines found in machine set %s"
+		appState.statusLabel.SetText(i18n.T("machineset.not_found", machineSetID)) //nolint
+		return
+	}
+
+	appState.treeRoot.Children = buildResourceNodes(resources, appState.stateClient, ctx)
+	appState.resourceTree.Refresh()
+	// Format directives are in translation file: "machineset.found" = "Found %d machines in machine set %s"
+	appState.statusLabel.SetText(i18n.T("machineset.found", len(resources), machineSetID)) //nolint
+}
+
+func findClusterMachinesByMachineSet(ctx context.Context, machineSetID string, appState *AppState) []map[string]interface{} {
+	resources := make([]map[string]interface{}, 0)
+	clusterMachineMD := resource.NewMetadata(omniresources.DefaultNamespace, omni.ClusterMachineType, "", resource.VersionUndefined)
+	list, err := appState.stateClient.List(ctx, clusterMachineMD)
+	if err != nil {
+		return resources
+	}
+
+	for _, item := range list.Items {
+		cm, ok := item.(*omni.ClusterMachine)
+		if !ok {
+			continue
+		}
+		labels := cm.Metadata().Labels()
+		if labels == nil {
+			continue
+		}
+		machineSet, ok := labels.Get(labelKeyMachineSet)
+		if !ok || machineSet != machineSetID {
+			continue
+		}
+		resources = append(resources, resconverter.ToMap(cm))
+	}
+
+	return resources
+}
+
+func loadResourcesByK8sVersion(version string, appState *AppState) {
+	ctx := context.Background()
+	resources := findResourcesByK8sVersion(ctx, version, appState)
+
+	if len(resources) == 0 {
+		// Format directive is in translation file: "k8s.version.not_found" = "No resources found with Kubernetes version %s"
+		appState.statusLabel.SetText(i18n.T("k8s.version.not_found", version)) //nolint
+		return
+	}
+
+	appState.treeRoot.Children = buildResourceNodes(resources, appState.stateClient, ctx)
+	appState.resourceTree.Refresh()
+	// Format directives are in translation file: "k8s.version.found" = "Found %d resources with Kubernetes version %s"
+	appState.statusLabel.SetText(i18n.T("k8s.version.found", len(resources), version)) //nolint
+}
+
+func findResourcesByK8sVersion(ctx context.Context, version string, appState *AppState) []map[string]interface{} {
+	resources := make([]map[string]interface{}, 0)
+	resources = append(resources, findClustersByK8sVersion(ctx, version, appState)...)
+	resources = append(resources, findClusterMachinesByK8sVersion(ctx, version, appState)...)
+	return resources
+}
+
+func findClustersByK8sVersion(ctx context.Context, version string, appState *AppState) []map[string]interface{} {
+	resources := make([]map[string]interface{}, 0)
+	clusterMD := resource.NewMetadata(omniresources.DefaultNamespace, omni.ClusterType, "", resource.VersionUndefined)
+	list, err := appState.stateClient.List(ctx, clusterMD)
+	if err != nil {
+		return resources
+	}
+
+	for _, item := range list.Items {
+		c, ok := item.(*omni.Cluster)
+		if !ok {
+			continue
+		}
+		if c.TypedSpec().Value.KubernetesVersion == version {
+			resources = append(resources, resconverter.ToMap(c))
+		}
+	}
+
+	return resources
+}
+
+func findClusterMachinesByK8sVersion(ctx context.Context, version string, appState *AppState) []map[string]interface{} {
+	resources := make([]map[string]interface{}, 0)
+	clusterMachineMD := resource.NewMetadata(omniresources.DefaultNamespace, omni.ClusterMachineType, "", resource.VersionUndefined)
+	list, err := appState.stateClient.List(ctx, clusterMachineMD)
+	if err != nil {
+		return resources
+	}
+
+	for _, item := range list.Items {
+		cm, ok := item.(*omni.ClusterMachine)
+		if !ok {
+			continue
+		}
+		if cm.TypedSpec().Value.KubernetesVersion == version {
+			resources = append(resources, resconverter.ToMap(cm))
+		}
+	}
+
+	return resources
+}
+
+func main() {
+	if err := i18n.Init("en"); err != nil {
+		log.Printf("Failed to initialize i18n: %v", err)
+	}
+
+	myApp := app.New()
+	myWindow := myApp.NewWindow(i18n.T("app.title"))
+	myWindow.Resize(fyne.NewSize(1400, 900))
+
+	omniClient, appState := initializeApp(myWindow)
+	if omniClient == nil {
+		return
+	}
+	defer omniClient.Close()
+
+	appState.selectedResourceType = i18n.T("resource.cluster")
+
+	resourceIDInput := createResourceIDInput()
+	resourceTree := createResourceTree(appState)
+	setupTreeSelection(resourceTree, appState)
+	detailComponents := createDetailComponents()
+	statusLabel := widget.NewLabel(i18n.T("app.ready"))
+	executeQuery := createExecuteQueryFunc(appState, resourceIDInput, statusLabel, omniClient.Omni().State())
+
+	setupResourceIDAutoQuery(resourceIDInput, appState, executeQuery)
+	burgerMenu := createBurgerMenu(myWindow, appState, executeQuery)
+
+	setupAppState(appState, resourceTree, resourceIDInput, statusLabel, detailComponents)
+
+	refreshUI := func() {
+		resourceQueries := getResourceQueries()
+		resourceOptions := make([]string, 0, len(resourceQueries))
+		for name := range resourceQueries {
+			resourceOptions = append(resourceOptions, name)
+		}
+		sort.Strings(resourceOptions)
+		burgerMenu.SetText(fmt.Sprintf("☰ %s", appState.selectedResourceType))
+
+		resourceIDInput.SetPlaceHolder(i18n.T("resource.id.placeholder"))
+		statusLabel.SetText(i18n.T("app.ready"))
+		appState.treeRoot.Label = i18n.T("tree.root")
+		if appState.detailTitle != nil {
+			appState.detailTitle.SetText(i18n.T("tree.select_resource"))
+		}
+		appState.resourceTree.Refresh()
+	}
+
+	langSelect := createLanguageSelector(appState, refreshUI)
+	mainContent := createMainLayout(burgerMenu, resourceIDInput, resourceTree, detailComponents, statusLabel, langSelect)
+
+	myWindow.SetContent(mainContent)
+
+	executeQuery()
+	myWindow.ShowAndRun()
+}
