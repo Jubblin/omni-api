@@ -21,7 +21,7 @@ import (
 var Version = "dev"
 
 // @title           Talos Omni Control API
-// @version         0.0.6
+// @version         0.0.7
 // @description     A REST API to interface with Sidero Omni.
 // @termsOfService  http://swagger.io/terms/
 
