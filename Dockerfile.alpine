@@ -35,7 +35,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     main.go
 
 # Runtime stage - Alpine Linux
-FROM alpine:3.20
+FROM alpine:3.23
 
 # Install CA certificates and timezone data
 RUN apk --no-cache add ca-certificates tzdata && \
