@@ -6,7 +6,7 @@ require (
 	github.com/cosi-project/runtime v1.13.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
-	github.com/siderolabs/omni/client v1.4.5
+	github.com/siderolabs/omni/client v1.4.6
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/files/v2 v2.0.2
