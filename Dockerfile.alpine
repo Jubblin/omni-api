@@ -64,14 +64,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Labels
-LABEL org.opencontainers.image.title="Omni API" \
-      org.opencontainers.image.description="A REST API to interface with Sidero Omni" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.revision="${COMMIT_SHA}" \
-      org.opencontainers.image.source="https://github.com/jubblin/omni-api" \
-      org.opencontainers.image.licenses="MIT"
-
 # Run the binary
 ENTRYPOINT ["/usr/local/bin/omni-api"]

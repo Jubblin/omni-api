@@ -82,6 +82,14 @@ jobs:
           push: false
           tags: omni-api:scan
           load: true
+          labels: |
+            org.opencontainers.image.title="Omni API"
+            org.opencontainers.image.description="A REST API to interface with Sidero Omni"
+            org.opencontainers.image.version=${{ env.COMMIT_VERSION }}
+            org.opencontainers.image.created=${{ env.COMMIT_BUILD_DATE }}
+            org.opencontainers.image.revision=${{ env.COMMIT_SHA }}
+            org.opencontainers.image.source=https://github.com/Jubblin/omni-api
+            org.opencontainers.image.licenses="MIT"
           build-args: |
             BUILD_DATE=${{ env.COMMIT_BUILD_DATE }}
             SHA=${{ env.COMMIT_SHA }}
