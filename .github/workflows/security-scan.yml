@@ -43,13 +43,14 @@ jobs:
           COMMIT_BUILD_DATE: ${{ steps.commit.outputs.build-date }}
           COMMIT_SHA: ${{ steps.commit.outputs.sha }}
           COMMIT_VERSION: ${{ steps.commit.outputs.version }}
+          DEST_IMAGE: omni-api-scan-image-${{ env.COMMIT_SHA }}.tar
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64, linux/arm64
           push: false
           tags: omni-api:scan
-          load: true
+          outputs: type=local,dest=./${{ env.DEST_IMAGE }}
           labels: |
             org.opencontainers.image.title="Omni API"
             org.opencontainers.image.description="A REST API to interface with Sidero Omni"
