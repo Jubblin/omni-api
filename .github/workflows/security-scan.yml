@@ -27,15 +27,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Get commit SHA
+        id: commit
+        run: |
+          echo "commit-sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "version=$(cat ./VERSION)" >> $GITHUB_OUTPUT
+          echo "build-date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Validate build configuration
         uses: docker/build-push-action@v6
         env:
-          VERSION: ${{ env.VERSION }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
-          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          VERSION: ${{ steps.commit.outputs.version }}
+          BUILD_DATE: ${{ steps.commit.outputs.build-date }}
+          COMMIT_SHA: ${{ steps.commit.outputs.commit-sha }}
         with:
           call: check
           context: .
@@ -49,9 +56,9 @@ jobs:
       - name: Build container for scanning
         uses: docker/build-push-action@v6
         env:
-          VERSION: ${{ env.VERSION }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
-          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          VERSION: ${{ steps.commit.outputs.version }}
+          BUILD_DATE: ${{ steps.commit.outputs.build-date }}
+          COMMIT_SHA: ${{ steps.commit.outputs.commit-sha }}
         with:
           context: .
           file: ./Dockerfile
@@ -69,6 +76,7 @@ jobs:
         with:
           image-ref: omni-api:scan
           format: "sarif"
+          exit-code: "0"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
 
@@ -84,5 +92,4 @@ jobs:
           scan-type: "fs"
           scan-ref: "."
           format: "table"
-          exit-code: "0"
           severity: "CRITICAL,HIGH"
