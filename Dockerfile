@@ -29,7 +29,8 @@ ARG SHA
 # TARGETOS and TARGETARCH are automatically set by Buildx for multi-arch builds
 ARG TARGETOS
 ARG TARGETARCH
-RUN echo "BUILD_DATE=${BUILD_DATE} SHA=${SHA} VERSION=${VERSION}" && \
+RUN go mod tidy && \
+    echo "BUILD_DATE=${BUILD_DATE} SHA=${SHA} VERSION=${VERSION}" && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s \
     -X main.Version=${VERSION} \
     -X github.com/jubblin/omni-api/internal/api/handlers.Version=${VERSION} \
