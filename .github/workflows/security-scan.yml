@@ -72,8 +72,12 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
+        env:
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          DEST_IMAGE: omni-api-scan-image-${{ env.COMMIT_SHA }}.tar
         with:
-          image-ref: omni-api:scan
+          input: ./${{ env.DEST_IMAGE }}
+          # image-ref: omni-api:scan
           format: "sarif"
           exit-code: "0"
           output: "trivy-results.sarif"
