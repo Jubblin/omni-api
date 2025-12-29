@@ -34,8 +34,24 @@ jobs:
           printenv
           ls -la
           echo "commit-sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "version=$(cat ./VERSION)" >> $GITHUB_OUTPUT
+          echo "version=$(cat ${GITHUB_WORKSPACE}/VERSION)" >> $GITHUB_OUTPUT
           echo "build-date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Confirm build configuration
+        id: confirm
+        env:
+          VERSION: ${{ steps.commit.outputs.version }}
+          BUILD_DATE: ${{ steps.commit.outputs.build-date }}
+          COMMIT_SHA: ${{ steps.commit.outputs.commit-sha }}
+        run: |
+          echo "VERSION: ${{ env.VERSION }}"
+          echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
+          echo "COMMIT_SHA: ${{ env.COMMIT_SHA }}"
+          echo "--------------------------------"
+          echo "steps.commit.outputs.version: ${{ steps.commit.outputs.version }}"
+          echo "steps.commit.outputs.build-date: ${{ steps.commit.outputs.build-date }}"
+          echo "steps.commit.outputs.commit-sha: ${{ steps.commit.outputs.commit-sha }}"
+          echo "--------------------------------"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
