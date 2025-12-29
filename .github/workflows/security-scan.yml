@@ -73,6 +73,10 @@ jobs:
             org.opencontainers.image.revision=${{ env.COMMIT_SHA }}
             org.opencontainers.image.source=https://github.com/Jubblin/omni-api
             org.opencontainers.image.licenses="MIT"
+          build-args: |
+            BUILD_DATE=${{ env.COMMIT_BUILD_DATE }}
+            SHA=${{ env.COMMIT_SHA }}
+            VERSION=${{ env.COMMIT_VERSION }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
