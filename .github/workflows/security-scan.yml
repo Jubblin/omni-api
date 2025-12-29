@@ -33,6 +33,7 @@ jobs:
           echo "build-date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
           echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "version=$(cat ${GITHUB_WORKSPACE}/VERSION)" >> $GITHUB_OUTPUT
+          echo "dest-image=omni-api-scan-image-$(git rev-parse --short HEAD).tar" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -43,7 +44,7 @@ jobs:
           COMMIT_BUILD_DATE: ${{ steps.commit.outputs.build-date }}
           COMMIT_SHA: ${{ steps.commit.outputs.sha }}
           COMMIT_VERSION: ${{ steps.commit.outputs.version }}
-          DEST_IMAGE: omni-api-scan-image-${{ env.COMMIT_SHA }}.tar
+          DEST_IMAGE: ${{ steps.commit.outputs.dest-image }}
         with:
           context: .
           file: ./Dockerfile
@@ -64,19 +65,12 @@ jobs:
             SHA=${{ env.COMMIT_SHA }}
             VERSION=${{ env.COMMIT_VERSION }}
 
-      # - name: Load image
-      #   if: github.event_name != 'pull_request'
-      #   run: |
-      #     docker load -i /tmp/${{ matrix.arch }}${{ matrix.image-suffix }}-image.tar
-      #     docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.arch }}${{ matrix.image-suffix }}-local ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.arch }}${{ matrix.image-suffix }}-scan
-
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         env:
-          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
-          DEST_IMAGE: omni-api-scan-image-${{ env.COMMIT_SHA }}.tar
+          DEST_IMAGE: ${{ steps.commit.outputs.dest-image }}
         with:
-          input: ./${{ env.DEST_IMAGE }}
+          input: ./${{ steps.commit.outputs.dest-image }}
           # image-ref: omni-api:scan
           format: "sarif"
           exit-code: "0"
