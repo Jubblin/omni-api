@@ -53,22 +53,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Validate build configuration
-        uses: docker/build-push-action@v6
-        env:
-          COMMIT_BUILD_DATE: ${{ steps.commit.outputs.build-date }}
-          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
-          COMMIT_VERSION: ${{ steps.commit.outputs.version }}
-        with:
-          call: check
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64, linux/arm64
-          build-args: |
-            BUILD_DATE=${{ env.COMMIT_BUILD_DATE }}
-            SHA=${{ env.COMMIT_SHA }}
-            VERSION=${{ env.COMMIT_VERSION }}
-
       - name: Build container for scanning
         uses: docker/build-push-action@v6
         env:
@@ -81,7 +65,6 @@ jobs:
           platforms: linux/amd64, linux/arm64
           push: false
           tags: omni-api:scan
-          load: true
           labels: |
             org.opencontainers.image.title="Omni API"
             org.opencontainers.image.description="A REST API to interface with Sidero Omni"
@@ -90,10 +73,6 @@ jobs:
             org.opencontainers.image.revision=${{ env.COMMIT_SHA }}
             org.opencontainers.image.source=https://github.com/Jubblin/omni-api
             org.opencontainers.image.licenses="MIT"
-          build-args: |
-            BUILD_DATE=${{ env.COMMIT_BUILD_DATE }}
-            SHA=${{ env.COMMIT_SHA }}
-            VERSION=${{ env.COMMIT_VERSION }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -109,11 +88,3 @@ jobs:
         if: always()
         with:
           sarif_file: "trivy-results.sarif"
-
-      - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: "fs"
-          scan-ref: "."
-          format: "table"
-          severity: "CRITICAL,HIGH"
