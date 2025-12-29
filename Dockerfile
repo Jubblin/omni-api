@@ -66,7 +66,7 @@ LABEL org.opencontainers.image.title="Omni API" \
       org.opencontainers.image.description="A REST API to interface with Sidero Omni" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.revision="${COMMIT_SHA}" \
+      org.opencontainers.image.revision="${SHA}" \
       org.opencontainers.image.source="https://github.com/jubblin/omni-api" \
       org.opencontainers.image.licenses="MIT"
 

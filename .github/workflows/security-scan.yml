@@ -30,27 +30,24 @@ jobs:
       - name: Get commit SHA
         id: commit
         run: |
-          pwd
-          printenv
-          ls -la
-          echo "commit-sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "version=$(cat ${GITHUB_WORKSPACE}/VERSION)" >> $GITHUB_OUTPUT
           echo "build-date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "version=$(cat ${GITHUB_WORKSPACE}/VERSION)" >> $GITHUB_OUTPUT
 
       - name: Confirm build configuration
         id: confirm
         env:
-          VERSION: ${{ steps.commit.outputs.version }}
-          BUILD_DATE: ${{ steps.commit.outputs.build-date }}
-          COMMIT_SHA: ${{ steps.commit.outputs.commit-sha }}
+          COMMIT_BUILD_DATE: ${{ steps.commit.outputs.build-date }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          COMMIT_VERSION: ${{ steps.commit.outputs.version }}
         run: |
-          echo "VERSION: ${{ env.VERSION }}"
-          echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
-          echo "COMMIT_SHA: ${{ env.COMMIT_SHA }}"
+          echo "env.COMMIT_BUILD_DATE: ${{ env.COMMIT_BUILD_DATE }}"
+          echo "env.COMMIT_SHA: ${{ env.COMMIT_SHA }}"
+          echo "env.COMMIT_VERSION: ${{ env.COMMIT_VERSION }}"
           echo "--------------------------------"
-          echo "steps.commit.outputs.version: ${{ steps.commit.outputs.version }}"
           echo "steps.commit.outputs.build-date: ${{ steps.commit.outputs.build-date }}"
-          echo "steps.commit.outputs.commit-sha: ${{ steps.commit.outputs.commit-sha }}"
+          echo "steps.commit.outputs.sha: ${{ steps.commit.outputs.sha }}"
+          echo "steps.commit.outputs.version: ${{ steps.commit.outputs.version }}"
           echo "--------------------------------"
 
       - name: Set up Docker Buildx
@@ -59,25 +56,25 @@ jobs:
       - name: Validate build configuration
         uses: docker/build-push-action@v6
         env:
-          VERSION: ${{ steps.commit.outputs.version }}
-          BUILD_DATE: ${{ steps.commit.outputs.build-date }}
-          COMMIT_SHA: ${{ steps.commit.outputs.commit-sha }}
+          COMMIT_BUILD_DATE: ${{ steps.commit.outputs.build-date }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          COMMIT_VERSION: ${{ steps.commit.outputs.version }}
         with:
           call: check
           context: .
           file: ./Dockerfile
           platforms: linux/amd64, linux/arm64
           build-args: |
-            VERSION=${{ env.VERSION }}
-            BUILD_DATE=${{ env.BUILD_DATE }}
-            COMMIT_SHA=${{ env.COMMIT_SHA }}
+            BUILD_DATE=${{ env.COMMIT_BUILD_DATE }}
+            SHA=${{ env.COMMIT_SHA }}
+            VERSION=${{ env.COMMIT_VERSION }}
 
       - name: Build container for scanning
         uses: docker/build-push-action@v6
         env:
-          VERSION: ${{ steps.commit.outputs.version }}
-          BUILD_DATE: ${{ steps.commit.outputs.build-date }}
-          COMMIT_SHA: ${{ steps.commit.outputs.commit-sha }}
+          COMMIT_BUILD_DATE: ${{ steps.commit.outputs.build-date }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          COMMIT_VERSION: ${{ steps.commit.outputs.version }}
         with:
           context: .
           file: ./Dockerfile
@@ -86,9 +83,9 @@ jobs:
           tags: omni-api:scan
           load: true
           build-args: |
-            VERSION=${{ env.VERSION }}
-            BUILD_DATE=${{ env.BUILD_DATE }}
-            COMMIT_SHA=${{ env.COMMIT_SHA }}
+            BUILD_DATE=${{ env.COMMIT_BUILD_DATE }}
+            SHA=${{ env.COMMIT_SHA }}
+            VERSION=${{ env.COMMIT_VERSION }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
