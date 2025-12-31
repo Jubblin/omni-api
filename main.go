@@ -113,6 +113,28 @@ func main() {
 	healthHandler := handlers.NewHealthHandler(client.Omni().State())
 	metricsHandler := handlers.NewMetricsHandler()
 
+	// Create service wrappers
+	mgmtService := omniclient.NewManagementService(client)
+	talosService := omniclient.NewTalosService(client)
+	authService := omniclient.NewAuthService(client)
+	oidcService := omniclient.NewOIDCService(client)
+
+	// Write operation handlers (using Management service)
+	clusterWriteHandler := handlers.NewClusterWriteHandler(client.Omni().State(), mgmtService)
+	machineWriteHandler := handlers.NewMachineWriteHandler(client.Omni().State(), mgmtService)
+	machineSetWriteHandler := handlers.NewMachineSetWriteHandler(client.Omni().State(), mgmtService)
+	configPatchWriteHandler := handlers.NewConfigPatchWriteHandler(client.Omni().State(), mgmtService)
+
+	// Action handlers
+	clusterActionsHandler := handlers.NewClusterActionsHandler(client.Omni().State(), mgmtService, talosService)
+	machineActionsHandler := handlers.NewMachineActionsHandler(client.Omni().State(), mgmtService, talosService)
+	machineSetActionsHandler := handlers.NewMachineSetActionsHandler(client.Omni().State(), mgmtService)
+	etcdBackupActionsHandler := handlers.NewEtcdBackupActionsHandler(client.Omni().State(), mgmtService)
+
+	// Auth and OIDC handlers
+	authHandler := handlers.NewAuthHandler(authService)
+	oidcHandler := handlers.NewOIDCHandler(oidcService)
+
 	// Health and Metrics routes (outside v1 group for easier access)
 	r.GET("/health", healthHandler.GetHealth)
 	r.GET("/metrics", metricsHandler.GetMetrics)
@@ -138,6 +160,17 @@ func main() {
 		v1.GET("/clusters/:id/destroy-status", clusterDestroyStatusHandler.GetClusterDestroyStatus)
 		v1.GET("/clusters/:id/workload-proxy-status", clusterWorkloadProxyStatusHandler.GetClusterWorkloadProxyStatus)
 		
+		// Cluster write operations
+		v1.POST("/clusters", clusterWriteHandler.CreateCluster)
+		v1.PUT("/clusters/:id", clusterWriteHandler.UpdateCluster)
+		v1.DELETE("/clusters/:id", clusterWriteHandler.DeleteCluster)
+		
+		// Cluster actions
+		v1.POST("/clusters/:id/actions/kubernetes-upgrade", clusterActionsHandler.TriggerKubernetesUpgrade)
+		v1.POST("/clusters/:id/actions/talos-upgrade", clusterActionsHandler.TriggerTalosUpgrade)
+		v1.POST("/clusters/:id/actions/bootstrap", clusterActionsHandler.TriggerBootstrap)
+		v1.POST("/clusters/:id/actions/destroy", clusterActionsHandler.TriggerDestroy)
+		
 		// Machine routes
 		v1.GET("/machines", machineHandler.ListMachines)
 		v1.GET("/machines/:id", machineHandler.GetMachine)
@@ -148,11 +181,28 @@ func main() {
 		v1.GET("/machines/:id/metrics", machineStatusMetricsHandler.GetMachineStatusMetrics)
 		v1.GET("/machines/:id/config-diff", machineConfigDiffHandler.GetMachineConfigDiff)
 		
+		// Machine write operations
+		v1.PATCH("/machines/:id", machineWriteHandler.UpdateMachine)
+		
+		// Machine actions
+		v1.POST("/machines/:id/actions/reboot", machineActionsHandler.RebootMachine)
+		v1.POST("/machines/:id/actions/shutdown", machineActionsHandler.ShutdownMachine)
+		v1.POST("/machines/:id/actions/reset", machineActionsHandler.ResetMachine)
+		v1.POST("/machines/:id/actions/maintenance", machineActionsHandler.ToggleMaintenance)
+		
 		// MachineSet routes
 		v1.GET("/machinesets", machineSetHandler.ListMachineSets)
 		v1.GET("/machinesets/:id", machineSetHandler.GetMachineSet)
 		v1.GET("/machinesets/:id/status", machineSetStatusHandler.GetMachineSetStatus)
 		v1.GET("/machinesets/:id/destroy-status", machineSetDestroyStatusHandler.GetMachineSetDestroyStatus)
+		
+		// MachineSet write operations
+		v1.POST("/machinesets", machineSetWriteHandler.CreateMachineSet)
+		v1.PUT("/machinesets/:id", machineSetWriteHandler.UpdateMachineSet)
+		v1.DELETE("/machinesets/:id", machineSetWriteHandler.DeleteMachineSet)
+		
+		// MachineSet actions
+		v1.POST("/machinesets/:id/actions/destroy", machineSetActionsHandler.TriggerDestroy)
 		
 		// MachineSetNode routes
 		v1.GET("/machinesetnodes", machineSetNodeHandler.ListMachineSetNodes)
@@ -161,6 +211,11 @@ func main() {
 		// ConfigPatch routes
 		v1.GET("/configpatches", configPatchHandler.ListConfigPatches)
 		v1.GET("/configpatches/:id", configPatchHandler.GetConfigPatch)
+		
+		// ConfigPatch write operations
+		v1.POST("/configpatches", configPatchWriteHandler.CreateConfigPatch)
+		v1.PUT("/configpatches/:id", configPatchWriteHandler.UpdateConfigPatch)
+		v1.DELETE("/configpatches/:id", configPatchWriteHandler.DeleteConfigPatch)
 		
 		// ClusterMachine routes
 		v1.GET("/clustermachines", clusterMachineHandler.ListClusterMachines)
@@ -180,6 +235,9 @@ func main() {
 		v1.GET("/etcdbackups/:id/status", etcdBackupStatusHandler.GetEtcdBackupStatus)
 		v1.GET("/etcd-manual-backups", etcdManualBackupHandler.ListEtcdManualBackups)
 		v1.GET("/etcd-manual-backups/:id", etcdManualBackupHandler.GetEtcdManualBackup)
+		
+		// EtcdBackup actions
+		v1.POST("/etcdbackups", etcdBackupActionsHandler.TriggerManualBackup)
 		
 		// Schematic routes
 		v1.GET("/schematics", schematicHandler.ListSchematics)
@@ -228,6 +286,19 @@ func main() {
 		// Infrastructure Machine Config routes
 		v1.GET("/infra-machine-configs", infraMachineConfigHandler.ListInfraMachineConfigs)
 		v1.GET("/infra-machine-configs/:id", infraMachineConfigHandler.GetInfraMachineConfig)
+		
+		// Auth service routes
+		v1.GET("/auth/service-accounts", authHandler.ListServiceAccounts)
+		v1.GET("/auth/service-accounts/:id", authHandler.GetServiceAccount)
+		v1.POST("/auth/service-accounts", authHandler.CreateServiceAccount)
+		v1.DELETE("/auth/service-accounts/:id", authHandler.DeleteServiceAccount)
+		
+		// OIDC service routes
+		v1.GET("/oidc/providers", oidcHandler.ListOIDCProviders)
+		v1.GET("/oidc/providers/:id", oidcHandler.GetOIDCProvider)
+		v1.POST("/oidc/providers", oidcHandler.CreateOIDCProvider)
+		v1.PUT("/oidc/providers/:id", oidcHandler.UpdateOIDCProvider)
+		v1.DELETE("/oidc/providers/:id", oidcHandler.DeleteOIDCProvider)
 	}
 
 	// Redirect root to Swagger UI

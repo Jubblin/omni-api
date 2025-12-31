@@ -1,0 +1,3 @@
+doc: cannot find package "github.com/siderolabs/omni/client/pkg/oidc" in any of:
+	($GOROOT not set)
+	/Users/richardw/go/src/github.com/siderolabs/omni/client/pkg/oidc (from $GOPATH)
