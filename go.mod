@@ -9,8 +9,10 @@ require (
 	github.com/siderolabs/omni/client v1.4.6
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
+	github.com/swaggo/files/v2 v2.0.2
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
+	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -107,6 +109,5 @@ require (
 	golang.org/x/tools v0.40.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
-	google.golang.org/grpc v1.77.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
