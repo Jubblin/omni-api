@@ -258,7 +258,7 @@ jobs:
 
       - name: Upload SBOM artifact
         if: github.event_name != 'pull_request' && always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: sbom-${{ matrix.dockerfile }}-${{ matrix.arch }}-${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.commit-sha }}
