@@ -39,7 +39,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build container for scanning
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         env:
           COMMIT_BUILD_DATE: ${{ steps.commit.outputs.build-date }}
           COMMIT_SHA: ${{ steps.commit.outputs.sha }}
