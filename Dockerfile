@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25.5-alpine3.23 AS builder
+FROM golang:1.25.5-alpine3.23@sha256:ac09a5f469f307e5da71e766b0bd59c9c49ea460a528cc3e6686513d64a6f1fb AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -41,7 +41,7 @@ RUN go mod tidy && \
     main.go
 
 # Runtime stage - using distroless for minimal attack surface
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
 
 # Copy CA certificates from builder for TLS connections
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
